@@ -1,0 +1,5 @@
+{
+  "name": "Hess-e-Khub Finance",
+  "description": "A comprehensive double-entry accounting and financial management system designed for Hess-e-Khub to manage Café sales, Subscriptions, and Assessments with automated expense approval workflows and AI-driven financial insights.",
+  "requestFramePermissions": []
+}

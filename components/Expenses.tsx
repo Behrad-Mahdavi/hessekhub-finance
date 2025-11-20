@@ -1,0 +1,394 @@
+import React, { useState, useMemo } from 'react';
+import { PurchaseRequest, TransactionStatus, UserRole } from '../types';
+import { toPersianDate } from '../utils';
+import { Plus, Check, X, FileText, Upload, Image as ImageIcon, Trash2, Search, Filter, BarChart3, Scale } from 'lucide-react';
+
+interface ExpensesProps {
+  purchases: PurchaseRequest[];
+  onAddPurchase: (p: PurchaseRequest) => void;
+  onApprovePurchase: (id: string) => void;
+  onRejectPurchase: (id: string) => void;
+}
+
+const Expenses: React.FC<ExpensesProps> = ({ purchases, onAddPurchase, onApprovePurchase, onRejectPurchase }) => {
+  const [showForm, setShowForm] = useState(false);
+  const [fileName, setFileName] = useState<string>('');
+
+  // Form State
+  const [formData, setFormData] = useState({
+    amount: '',
+    category: 'هزینه مواد اولیه',
+    supplier: '',
+    description: '',
+    requester: 'کاربر جاری',
+    quantity: '',
+    unit: 'گرم'
+  });
+
+  // Analysis State
+  const [searchTerm, setSearchTerm] = useState('');
+  const [timeFilter, setTimeFilter] = useState<'ALL' | 'WEEK' | 'MONTH'>('ALL');
+
+  // All users can approve
+  const canApprove = true;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const newPurchase: PurchaseRequest = {
+      id: `PUR-${Math.floor(Math.random() * 10000)}`,
+      ...formData,
+      amount: parseFloat(formData.amount),
+      status: TransactionStatus.PENDING,
+      date: toPersianDate(new Date()),
+      imageUrl: fileName ? 'uploaded-mock-url' : undefined,
+      quantity: formData.quantity ? parseFloat(formData.quantity) : undefined,
+      unit: formData.quantity ? formData.unit : undefined
+    };
+    onAddPurchase(newPurchase);
+    setShowForm(false);
+    setFormData({ amount: '', category: 'هزینه مواد اولیه', supplier: '', description: '', requester: 'کاربر جاری', quantity: '', unit: 'گرم' });
+    setFileName('');
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setFileName(e.target.files[0].name);
+    }
+  };
+
+  const getStatusLabel = (status: TransactionStatus) => {
+    switch (status) {
+      case TransactionStatus.PENDING: return 'در انتظار تایید';
+      case TransactionStatus.APPROVED: return 'تایید شده';
+      case TransactionStatus.REJECTED: return 'رد شده';
+      default: return status;
+    }
+  };
+
+  // --- Analysis Logic ---
+  const filteredPurchases = useMemo(() => {
+    return purchases.filter(p => {
+      const matchesSearch =
+        p.description.includes(searchTerm) ||
+        p.supplier.includes(searchTerm) ||
+        p.category.includes(searchTerm);
+
+      // Note: Ideally we parse Persian dates for accurate time filtering. 
+      // For MVP, 'ALL' shows everything. 'WEEK' could just check if date string matches last 7 entries etc.
+      // Simplified logic for now:
+      return matchesSearch;
+    });
+  }, [purchases, searchTerm]);
+
+  const totalFilteredAmount = filteredPurchases.reduce((sum, p) => sum + p.amount, 0);
+  const totalFilteredQuantity = filteredPurchases.reduce((sum, p) => sum + (p.quantity || 0), 0);
+  // Only show unit summary if all filtered items have same unit or if it's mixed
+  const dominantUnit = filteredPurchases.length > 0 ? filteredPurchases[0].unit : '';
+
+  return (
+    <div className="p-4 md:p-8 pb-20">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-8">
+        <div>
+          <h2 className="text-2xl md:text-3xl font-bold text-slate-800 mb-2">هزینه‌ها و خرید</h2>
+          <p className="text-slate-500 text-sm md:text-base">مدیریت خرید مواد اولیه، اجاره، قبوض و سایر مخارج</p>
+        </div>
+        <button
+          onClick={() => setShowForm(!showForm)}
+          className="flex items-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 w-full md:w-auto justify-center"
+        >
+          <Plus className="w-5 h-5" />
+          ثبت خرید جدید
+        </button>
+      </div>
+
+      {/* Analysis Panel */}
+      <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 mb-8">
+        <div className="flex items-center gap-2 mb-4 text-slate-700 font-bold">
+          <BarChart3 className="w-5 h-5 text-indigo-500" />
+          <span>تحلیل و جستجو اقلام</span>
+        </div>
+        <div className="flex flex-col md:flex-row gap-4 mb-4">
+          <div className="relative flex-1">
+            <input
+              type="text"
+              placeholder="جستجو نام کالا (مثلاً: مرغ، قهوه)..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-4 pr-10 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+            />
+            <Search className="absolute left-3 top-2.5 w-5 h-5 text-slate-400" />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-500 whitespace-nowrap">بازه زمانی:</span>
+            <select
+              value={timeFilter}
+              onChange={(e) => setTimeFilter(e.target.value as any)}
+              className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none"
+            >
+              <option value="ALL">همه زمان‌ها</option>
+              <option value="WEEK">۷ روز گذشته</option>
+              <option value="MONTH">۳۰ روز گذشته</option>
+            </select>
+          </div>
+        </div>
+
+        {searchTerm && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-fade-in-down">
+            <div className="bg-indigo-50 p-3 rounded-xl border border-indigo-100">
+              <p className="text-xs text-indigo-600 mb-1">تعداد خرید</p>
+              <p className="font-bold text-indigo-800 text-lg">{filteredPurchases.length}</p>
+            </div>
+            <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-100">
+              <p className="text-xs text-emerald-600 mb-1">مجموع هزینه</p>
+              <p className="font-bold text-emerald-800 text-lg dir-ltr text-right">{totalFilteredAmount.toLocaleString()}</p>
+            </div>
+            {totalFilteredQuantity > 0 && (
+              <div className="bg-amber-50 p-3 rounded-xl border border-amber-100 col-span-2 md:col-span-1">
+                <p className="text-xs text-amber-600 mb-1">مجموع مقدار مصرف</p>
+                <p className="font-bold text-amber-800 text-lg flex items-center gap-1">
+                  {totalFilteredQuantity.toLocaleString()}
+                  <span className="text-xs font-normal bg-white px-1.5 py-0.5 rounded border border-amber-200">{dominantUnit}</span>
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {showForm && (
+        <div className="mb-8 bg-white p-4 md:p-6 rounded-2xl shadow-xl border border-slate-100 animate-fade-in-down">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-lg font-bold text-slate-700">فرم درخواست خرید</h3>
+            <button onClick={() => setShowForm(false)} className="text-slate-400 hover:text-rose-500"><X className="w-5 h-5" /></button>
+          </div>
+
+          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">نام تامین‌کننده / فروشگاه</label>
+              <input
+                required
+                type="text"
+                value={formData.supplier}
+                onChange={(e) => setFormData({ ...formData, supplier: e.target.value })}
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                placeholder="مثلاً: فروشگاه قهوه تهران"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">مبلغ فاکتور (تومان)</label>
+              <input
+                required
+                type="number"
+                value={formData.amount}
+                onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all dir-ltr text-left"
+                placeholder="0"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">دسته‌بندی هزینه</label>
+              <div className="relative">
+                <select
+                  value={formData.category}
+                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none appearance-none"
+                >
+                  <option>هزینه مواد اولیه</option>
+                  <option>هزینه اجاره</option>
+                  <option>هزینه آب و برق</option>
+                  <option>ملزومات اداری</option>
+                  <option>تعمیرات و نگهداری</option>
+                  <option>تبلیغات و بازاریابی</option>
+                </select>
+                <div className="absolute left-3 top-3.5 pointer-events-none text-slate-400">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                </div>
+              </div>
+            </div>
+
+            {/* Quantity Input - Only for Raw Materials */}
+            {formData.category === 'هزینه مواد اولیه' ? (
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex gap-2">
+                <div className="flex-1">
+                  <label className="block text-xs font-bold text-slate-500 mb-1">مقدار/وزن</label>
+                  <input
+                    type="number"
+                    value={formData.quantity}
+                    onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+                    className="w-full p-2 bg-white border border-slate-200 rounded-lg outline-none dir-ltr text-center"
+                    placeholder="مثلاً 500"
+                  />
+                </div>
+                <div className="w-1/3">
+                  <label className="block text-xs font-bold text-slate-500 mb-1">واحد</label>
+                  <select
+                    value={formData.unit}
+                    onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+                    className="w-full p-2 bg-white border border-slate-200 rounded-lg outline-none"
+                  >
+                    <option>گرم</option>
+                    <option>کیلوگرم</option>
+                    <option>عدد</option>
+                    <option>لیتر</option>
+                    <option>بسته</option>
+                  </select>
+                </div>
+              </div>
+            ) : (
+              <div></div> // Empty spacer
+            )}
+
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-slate-700 mb-2">توضیحات / نام اقلام</label>
+              <input
+                type="text"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                placeholder="مثلاً: فیله مرغ، قهوه عربیکا..."
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-slate-700 mb-2">تصویر فاکتور</label>
+              <div className={`border-2 border-dashed rounded-xl p-6 flex flex-col items-center justify-center transition-colors ${fileName ? 'border-emerald-300 bg-emerald-50' : 'border-slate-300 hover:border-indigo-400 hover:bg-slate-50'}`}>
+                {!fileName ? (
+                  <label className="cursor-pointer flex flex-col items-center">
+                    <Upload className="w-8 h-8 text-slate-400 mb-2" />
+                    <span className="text-sm text-slate-600 font-medium">برای آپلود تصویر کلیک کنید</span>
+                    <span className="text-xs text-slate-400 mt-1">JPG, PNG تا 5MB</span>
+                    <input type="file" className="hidden" onChange={handleFileChange} accept="image/*" />
+                  </label>
+                ) : (
+                  <div className="flex items-center gap-4 w-full">
+                    <div className="p-3 bg-white rounded-lg shadow-sm">
+                      <ImageIcon className="w-6 h-6 text-emerald-600" />
+                    </div>
+                    <div className="flex-1 text-left">
+                      <p className="text-sm font-bold text-slate-700">{fileName}</p>
+                      <p className="text-xs text-emerald-600">آپلود شد</p>
+                    </div>
+                    <button type="button" onClick={() => setFileName('')} className="p-2 hover:bg-rose-100 text-rose-500 rounded-lg">
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="md:col-span-2 flex flex-col-reverse md:flex-row justify-end gap-3 pt-4 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowForm(false)}
+                className="w-full md:w-auto px-6 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl font-medium transition-colors"
+              >
+                انصراف
+              </button>
+              <button
+                type="submit"
+                className="w-full md:w-auto px-6 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 font-medium shadow-md shadow-indigo-200 transition-all"
+              >
+                ثبت نهایی و ارسال
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-right min-w-[900px]">
+            <thead className="bg-slate-50 border-b border-slate-200">
+              <tr>
+                <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">تاریخ ثبت</th>
+                <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">شرح خرید</th>
+                <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">دسته‌بندی</th>
+                <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">مقدار</th>
+                <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">مبلغ (تومان)</th>
+                <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">وضعیت</th>
+                <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-left">عملیات</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filteredPurchases.map((p) => (
+                <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
+                  <td className="p-4 text-sm text-slate-600 font-medium">{p.date}</td>
+                  <td className="p-4">
+                    <div className="font-bold text-slate-800 text-sm">{p.supplier}</div>
+                    <div className="text-xs text-slate-400 mt-1">{p.description}</div>
+                  </td>
+                  <td className="p-4">
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                      {p.category}
+                    </span>
+                  </td>
+                  <td className="p-4 text-sm text-slate-600">
+                    {p.quantity ? (
+                      <span className="bg-amber-50 text-amber-700 px-2 py-1 rounded border border-amber-100 text-xs font-bold">
+                        {p.quantity} {p.unit}
+                      </span>
+                    ) : '-'}
+                  </td>
+                  <td className="p-4 text-sm font-bold text-slate-800 dir-ltr text-right">{p.amount.toLocaleString('fa-IR')}</td>
+                  <td className="p-4">
+                    <span
+                      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${p.status === TransactionStatus.APPROVED
+                          ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                          : p.status === TransactionStatus.REJECTED
+                            ? 'bg-rose-100 text-rose-700 border border-rose-200'
+                            : 'bg-amber-100 text-amber-700 border border-amber-200'
+                        }`}
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full ${p.status === TransactionStatus.APPROVED ? 'bg-emerald-600' :
+                          p.status === TransactionStatus.REJECTED ? 'bg-rose-600' : 'bg-amber-600'
+                        }`}></span>
+                      {getStatusLabel(p.status)}
+                    </span>
+                  </td>
+                  <td className="p-4 text-left">
+                    <div className="flex items-center justify-end gap-2">
+                      {p.status === TransactionStatus.PENDING && canApprove ? (
+                        <>
+                          <button
+                            onClick={() => onApprovePurchase(p.id)}
+                            className="p-2 bg-white border border-slate-200 text-emerald-600 hover:bg-emerald-50 hover:border-emerald-300 rounded-lg transition-all shadow-sm"
+                            title="تایید و ثبت در دفتر کل"
+                          >
+                            <Check className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => onRejectPurchase(p.id)}
+                            className="p-2 bg-white border border-slate-200 text-rose-600 hover:bg-rose-50 hover:border-rose-300 rounded-lg transition-all shadow-sm"
+                            title="رد درخواست"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </>
+                      ) : (
+                        <button className="p-2 text-slate-400 hover:text-indigo-600 transition-colors" title="مشاهده جزئیات">
+                          <FileText className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {purchases.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="p-12 text-center text-slate-400 bg-slate-50/50">
+                    <div className="flex flex-col items-center gap-2">
+                      <FileText className="w-8 h-8 text-slate-300" />
+                      <span>هیچ درخواست خریدی یافت نشد.</span>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Expenses;
