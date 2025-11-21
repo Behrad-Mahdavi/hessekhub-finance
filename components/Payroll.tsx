@@ -1,18 +1,22 @@
 import React, { useState } from 'react';
-import { Employee } from '../types';
+import { Employee, Account, PayrollPayment } from '../types';
 import { formatPrice } from '../utils';
-import { Users, Plus, DollarSign, Trash2, UserPlus } from 'lucide-react';
+import { Users, Plus, DollarSign, Trash2, UserPlus, Eye } from 'lucide-react';
+import EmployeeProfileModal from './EmployeeProfileModal';
 
 interface PayrollProps {
    employees: Employee[];
+   accounts: Account[];
+   payrollPayments: PayrollPayment[];
    onAddEmployee: (emp: Employee) => void;
    onDeleteEmployee: (id: string) => void;
-   onPaySalary: (emp: Employee, amount: number, date: string) => void;
+   onPaySalary: (payment: PayrollPayment) => void;
 }
 
-const Payroll: React.FC<PayrollProps> = ({ employees, onAddEmployee, onDeleteEmployee, onPaySalary }) => {
+const Payroll: React.FC<PayrollProps> = ({ employees, accounts, payrollPayments, onAddEmployee, onDeleteEmployee, onPaySalary }) => {
    const [isAdding, setIsAdding] = useState(false);
    const [newEmp, setNewEmp] = useState({ fullName: '', role: '', baseSalary: '' });
+   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
 
    const handleAdd = (e: React.FormEvent) => {
       e.preventDefault();
@@ -116,14 +120,25 @@ const Payroll: React.FC<PayrollProps> = ({ employees, onAddEmployee, onDeleteEmp
                   </div>
 
                   <button
-                     onClick={() => onPaySalary(emp, emp.baseSalary, new Date().toLocaleDateString('fa-IR'))}
-                     className="w-full py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors"
+                     onClick={() => setSelectedEmployee(emp)}
+                     className="w-full py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors"
                   >
-                     <DollarSign className="w-4 h-4" /> پرداخت حقوق ماه جاری
+                     <Eye className="w-4 h-4" /> مشاهده پروفایل و پرداخت حقوق
                   </button>
                </div>
             ))}
          </div>
+
+         {/* Employee Profile Modal */}
+         {selectedEmployee && (
+            <EmployeeProfileModal
+               employee={selectedEmployee}
+               accounts={accounts}
+               payrollPayments={payrollPayments}
+               onClose={() => setSelectedEmployee(null)}
+               onPaySalary={onPaySalary}
+            />
+         )}
       </div>
    );
 };

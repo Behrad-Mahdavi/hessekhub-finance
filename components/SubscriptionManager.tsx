@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Customer, Subscription, SaleRecord, Account, AccountType } from '../types';
 import { toPersianDate, formatPrice, calculateSubscriptionEndDate, isDeliveryDay } from '../utils';
-import { Users, Calendar, Search, Plus, User, FileText, CheckCircle, XCircle, Clock, CreditCard, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Users, Calendar, Search, Plus, User, FileText, CheckCircle, XCircle, Clock, CreditCard, AlertTriangle, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface SubscriptionManagerProps {
@@ -11,6 +11,7 @@ interface SubscriptionManagerProps {
     accounts: Account[];
     onAddCustomer: (c: Customer) => void;
     onUpdateCustomer: (c: Customer) => void;
+    onDeleteCustomer: (id: string) => void;
     onAddSubscription: (s: Subscription, sale: SaleRecord) => void;
 }
 
@@ -21,6 +22,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
     accounts,
     onAddCustomer,
     onUpdateCustomer,
+    onDeleteCustomer,
     onAddSubscription
 }) => {
     const [activeTab, setActiveTab] = useState<'DAILY' | 'CUSTOMERS'>('DAILY');
@@ -256,12 +258,21 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
                                                 )}
                                             </td>
                                             <td className="p-4">
-                                                <button
-                                                    onClick={() => setSelectedCustomer(customer)}
-                                                    className="text-indigo-600 hover:text-indigo-800 text-sm font-bold"
-                                                >
-                                                    مشاهده پروفایل
-                                                </button>
+                                                <div className="flex items-center gap-3">
+                                                    <button
+                                                        onClick={() => setSelectedCustomer(customer)}
+                                                        className="text-indigo-600 hover:text-indigo-800 text-sm font-bold"
+                                                    >
+                                                        مشاهده پروفایل
+                                                    </button>
+                                                    <button
+                                                        onClick={() => onDeleteCustomer(customer.id)}
+                                                        className="text-slate-400 hover:text-rose-500 transition-colors"
+                                                        title="حذف مشتری"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     );
@@ -270,208 +281,215 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
                         </table>
                     </div>
                 </div>
-            )}
+            )
+            }
 
             {/* Add Customer Modal */}
-            {showAddCustomerModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl w-full max-w-md p-6">
-                        <h3 className="text-xl font-bold mb-4">افزودن مشتری جدید</h3>
-                        <form onSubmit={handleCreateCustomer} className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-1">نام و نام خانوادگی</label>
-                                <input
-                                    required
-                                    type="text"
-                                    value={newCustomerName}
-                                    onChange={(e) => setNewCustomerName(e.target.value)}
-                                    className="w-full p-2 border border-slate-300 rounded-lg"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-1">شماره تماس</label>
-                                <input
-                                    required
-                                    type="tel"
-                                    value={newCustomerPhone}
-                                    onChange={(e) => setNewCustomerPhone(e.target.value)}
-                                    className="w-full p-2 border border-slate-300 rounded-lg dir-ltr text-left"
-                                />
-                            </div>
-                            <div className="flex gap-3 mt-6">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowAddCustomerModal(false)}
-                                    className="flex-1 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded-lg"
-                                >
-                                    انصراف
-                                </button>
-                                <button
-                                    type="submit"
-                                    className="flex-1 py-2 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700"
-                                >
-                                    افزودن
-                                </button>
-                            </div>
-                        </form>
+            {
+                showAddCustomerModal && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                        <div className="bg-white rounded-2xl w-full max-w-md p-6">
+                            <h3 className="text-xl font-bold mb-4">افزودن مشتری جدید</h3>
+                            <form onSubmit={handleCreateCustomer} className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-bold text-slate-700 mb-1">نام و نام خانوادگی</label>
+                                    <input
+                                        required
+                                        type="text"
+                                        value={newCustomerName}
+                                        onChange={(e) => setNewCustomerName(e.target.value)}
+                                        className="w-full p-2 border border-slate-300 rounded-lg"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-bold text-slate-700 mb-1">شماره تماس</label>
+                                    <input
+                                        required
+                                        type="tel"
+                                        value={newCustomerPhone}
+                                        onChange={(e) => setNewCustomerPhone(e.target.value)}
+                                        className="w-full p-2 border border-slate-300 rounded-lg dir-ltr text-left"
+                                    />
+                                </div>
+                                <div className="flex gap-3 mt-6">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowAddCustomerModal(false)}
+                                        className="flex-1 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded-lg"
+                                    >
+                                        انصراف
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="flex-1 py-2 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700"
+                                    >
+                                        افزودن
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* Customer Profile Modal */}
-            {selectedCustomer && !showRenewModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
-                        <div className="flex justify-between items-start mb-6">
-                            <div>
-                                <h3 className="text-2xl font-bold text-slate-800">{selectedCustomer.name}</h3>
-                                <p className="text-slate-500">{selectedCustomer.phoneNumber}</p>
+            {
+                selectedCustomer && !showRenewModal && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                        <div className="bg-white rounded-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
+                            <div className="flex justify-between items-start mb-6">
+                                <div>
+                                    <h3 className="text-2xl font-bold text-slate-800">{selectedCustomer.name}</h3>
+                                    <p className="text-slate-500">{selectedCustomer.phoneNumber}</p>
+                                </div>
+                                <button onClick={() => setSelectedCustomer(null)} className="text-slate-400 hover:text-slate-600">
+                                    <XCircle className="w-6 h-6" />
+                                </button>
                             </div>
-                            <button onClick={() => setSelectedCustomer(null)} className="text-slate-400 hover:text-slate-600">
-                                <XCircle className="w-6 h-6" />
-                            </button>
-                        </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                                <span className="block text-xs font-bold text-slate-500 uppercase mb-2">وضعیت حساب</span>
-                                <div className={`text-2xl font-bold ${selectedCustomer.balance < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                                    {formatPrice(selectedCustomer.balance)}
-                                    <span className="text-sm font-normal text-slate-500 mr-2">
-                                        {selectedCustomer.balance < 0 ? 'بدهکار' : 'بستانکار / تسویه'}
-                                    </span>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                                    <span className="block text-xs font-bold text-slate-500 uppercase mb-2">وضعیت حساب</span>
+                                    <div className={`text-2xl font-bold ${selectedCustomer.balance < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                        {formatPrice(selectedCustomer.balance)}
+                                        <span className="text-sm font-normal text-slate-500 mr-2">
+                                            {selectedCustomer.balance < 0 ? 'بدهکار' : 'بستانکار / تسویه'}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
+                                    <span className="block text-xs font-bold text-indigo-500 uppercase mb-2">اشتراک فعال</span>
+                                    {subscriptions.find(s => s.customerId === selectedCustomer.id && s.status === 'ACTIVE') ? (
+                                        <div>
+                                            <div className="text-xl font-bold text-indigo-700">
+                                                {subscriptions.find(s => s.customerId === selectedCustomer.id && s.status === 'ACTIVE')?.planName}
+                                            </div>
+                                            <div className="text-sm text-indigo-600 mt-1">
+                                                تا تاریخ {subscriptions.find(s => s.customerId === selectedCustomer.id && s.status === 'ACTIVE')?.endDate}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="text-slate-400 font-bold">اشتراک فعال ندارد</div>
+                                    )}
                                 </div>
                             </div>
-                            <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
-                                <span className="block text-xs font-bold text-indigo-500 uppercase mb-2">اشتراک فعال</span>
-                                {subscriptions.find(s => s.customerId === selectedCustomer.id && s.status === 'ACTIVE') ? (
-                                    <div>
-                                        <div className="text-xl font-bold text-indigo-700">
-                                            {subscriptions.find(s => s.customerId === selectedCustomer.id && s.status === 'ACTIVE')?.planName}
-                                        </div>
-                                        <div className="text-sm text-indigo-600 mt-1">
-                                            تا تاریخ {subscriptions.find(s => s.customerId === selectedCustomer.id && s.status === 'ACTIVE')?.endDate}
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="text-slate-400 font-bold">اشتراک فعال ندارد</div>
-                                )}
+
+                            <div className="mb-6">
+                                <button
+                                    onClick={() => setShowRenewModal(true)}
+                                    className="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
+                                >
+                                    <RefreshCw className="w-5 h-5" /> تمدید اشتراک / خرید پکیج
+                                </button>
                             </div>
-                        </div>
 
-                        <div className="mb-6">
-                            <button
-                                onClick={() => setShowRenewModal(true)}
-                                className="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
-                            >
-                                <RefreshCw className="w-5 h-5" /> تمدید اشتراک / خرید پکیج
-                            </button>
-                        </div>
-
-                        <div>
-                            <h4 className="font-bold text-slate-700 mb-4 border-b pb-2">تاریخچه اشتراک‌ها</h4>
-                            <div className="space-y-3">
-                                {subscriptions.filter(s => s.customerId === selectedCustomer.id).map(sub => (
-                                    <div key={sub.id} className="flex justify-between items-center p-3 bg-white border border-slate-100 rounded-lg text-sm">
-                                        <div>
-                                            <span className="font-bold block">{sub.planName}</span>
-                                            <span className="text-slate-500 text-xs">{sub.startDate} تا {sub.endDate}</span>
+                            <div>
+                                <h4 className="font-bold text-slate-700 mb-4 border-b pb-2">تاریخچه اشتراک‌ها</h4>
+                                <div className="space-y-3">
+                                    {subscriptions.filter(s => s.customerId === selectedCustomer.id).map(sub => (
+                                        <div key={sub.id} className="flex justify-between items-center p-3 bg-white border border-slate-100 rounded-lg text-sm">
+                                            <div>
+                                                <span className="font-bold block">{sub.planName}</span>
+                                                <span className="text-slate-500 text-xs">{sub.startDate} تا {sub.endDate}</span>
+                                            </div>
+                                            <div className={`px-2 py-1 rounded text-xs font-bold ${sub.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                                                {sub.status === 'ACTIVE' ? 'فعال' : 'منقضی'}
+                                            </div>
                                         </div>
-                                        <div className={`px-2 py-1 rounded text-xs font-bold ${sub.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-                                            {sub.status === 'ACTIVE' ? 'فعال' : 'منقضی'}
-                                        </div>
-                                    </div>
-                                ))}
-                                {subscriptions.filter(s => s.customerId === selectedCustomer.id).length === 0 && (
-                                    <p className="text-center text-slate-400 text-sm">هیچ سابقه‌ای یافت نشد.</p>
-                                )}
+                                    ))}
+                                    {subscriptions.filter(s => s.customerId === selectedCustomer.id).length === 0 && (
+                                        <p className="text-center text-slate-400 text-sm">هیچ سابقه‌ای یافت نشد.</p>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* Renew Modal */}
-            {showRenewModal && selectedCustomer && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl w-full max-w-md p-6">
-                        <h3 className="text-xl font-bold mb-4">تمدید اشتراک برای {selectedCustomer.name}</h3>
-                        <form onSubmit={handleRenew} className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-1">مدت پکیج (روزهای ارسال)</label>
-                                <select
-                                    value={renewPlanDays}
-                                    onChange={(e) => setRenewPlanDays(parseInt(e.target.value))}
-                                    className="w-full p-2 border border-slate-300 rounded-lg"
-                                >
-                                    <option value={6}>۱ هفته (۶ روز)</option>
-                                    <option value={12}>۲ هفته (۱۲ روز)</option>
-                                    <option value={24}>۱ ماه (۲۴ روز)</option>
-                                </select>
-                                <p className="text-xs text-slate-500 mt-1">
-                                    تاریخ پایان به صورت خودکار با کسر جمعه‌ها محاسبه می‌شود.
-                                </p>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-1">مبلغ پکیج</label>
-                                <input
-                                    required
-                                    type="number"
-                                    value={renewPrice}
-                                    onChange={(e) => setRenewPrice(e.target.value)}
-                                    className="w-full p-2 border border-slate-300 rounded-lg"
-                                    placeholder="0"
-                                />
-                            </div>
-
-                            <div className="flex items-center gap-2 my-2">
-                                <input
-                                    type="checkbox"
-                                    id="isCredit"
-                                    checked={renewIsCredit}
-                                    onChange={(e) => setRenewIsCredit(e.target.checked)}
-                                    className="w-4 h-4 text-indigo-600 rounded"
-                                />
-                                <label htmlFor="isCredit" className="text-sm font-bold text-slate-700">پرداخت نسیه (بدهکار شدن مشتری)</label>
-                            </div>
-
-                            {!renewIsCredit && (
+            {
+                showRenewModal && selectedCustomer && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                        <div className="bg-white rounded-2xl w-full max-w-md p-6">
+                            <h3 className="text-xl font-bold mb-4">تمدید اشتراک برای {selectedCustomer.name}</h3>
+                            <form onSubmit={handleRenew} className="space-y-4">
                                 <div>
-                                    <label className="block text-sm font-bold text-slate-700 mb-1">حساب دریافت کننده</label>
+                                    <label className="block text-sm font-bold text-slate-700 mb-1">مدت پکیج (روزهای ارسال)</label>
                                     <select
-                                        required
-                                        value={renewPaymentAccount}
-                                        onChange={(e) => setRenewPaymentAccount(e.target.value)}
+                                        value={renewPlanDays}
+                                        onChange={(e) => setRenewPlanDays(parseInt(e.target.value))}
                                         className="w-full p-2 border border-slate-300 rounded-lg"
                                     >
-                                        <option value="">انتخاب حساب...</option>
-                                        {accounts.filter(a => a.type === AccountType.ASSET).map(acc => (
-                                            <option key={acc.id} value={acc.id}>{acc.name}</option>
-                                        ))}
+                                        <option value={6}>۱ هفته (۶ روز)</option>
+                                        <option value={12}>۲ هفته (۱۲ روز)</option>
+                                        <option value={24}>۱ ماه (۲۴ روز)</option>
                                     </select>
+                                    <p className="text-xs text-slate-500 mt-1">
+                                        تاریخ پایان به صورت خودکار با کسر جمعه‌ها محاسبه می‌شود.
+                                    </p>
                                 </div>
-                            )}
+                                <div>
+                                    <label className="block text-sm font-bold text-slate-700 mb-1">مبلغ پکیج</label>
+                                    <input
+                                        required
+                                        type="number"
+                                        value={renewPrice}
+                                        onChange={(e) => setRenewPrice(e.target.value)}
+                                        className="w-full p-2 border border-slate-300 rounded-lg"
+                                        placeholder="0"
+                                    />
+                                </div>
 
-                            <div className="flex gap-3 mt-6">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowRenewModal(false)}
-                                    className="flex-1 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded-lg"
-                                >
-                                    انصراف
-                                </button>
-                                <button
-                                    type="submit"
-                                    className="flex-1 py-2 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700"
-                                >
-                                    ثبت و تمدید
-                                </button>
-                            </div>
-                        </form>
+                                <div className="flex items-center gap-2 my-2">
+                                    <input
+                                        type="checkbox"
+                                        id="isCredit"
+                                        checked={renewIsCredit}
+                                        onChange={(e) => setRenewIsCredit(e.target.checked)}
+                                        className="w-4 h-4 text-indigo-600 rounded"
+                                    />
+                                    <label htmlFor="isCredit" className="text-sm font-bold text-slate-700">پرداخت نسیه (بدهکار شدن مشتری)</label>
+                                </div>
+
+                                {!renewIsCredit && (
+                                    <div>
+                                        <label className="block text-sm font-bold text-slate-700 mb-1">حساب دریافت کننده</label>
+                                        <select
+                                            required
+                                            value={renewPaymentAccount}
+                                            onChange={(e) => setRenewPaymentAccount(e.target.value)}
+                                            className="w-full p-2 border border-slate-300 rounded-lg"
+                                        >
+                                            <option value="">انتخاب حساب...</option>
+                                            {accounts.filter(a => a.type === AccountType.ASSET).map(acc => (
+                                                <option key={acc.id} value={acc.id}>{acc.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
+
+                                <div className="flex gap-3 mt-6">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowRenewModal(false)}
+                                        className="flex-1 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded-lg"
+                                    >
+                                        انصراف
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="flex-1 py-2 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700"
+                                    >
+                                        ثبت و تمدید
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 };
 

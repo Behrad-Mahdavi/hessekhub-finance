@@ -178,9 +178,29 @@ export const addSubscription = async (subscription: Subscription) => {
     return await addDoc(collection(db, 'subscriptions'), cleanData(data));
 };
 
+
 export const updateSubscription = async (id: string, data: Partial<Subscription>) => {
     const docRef = doc(db, 'subscriptions', id);
     await updateDoc(docRef, cleanData(data));
+};
+
+export const deleteSubscription = async (id: string) => {
+    const docRef = doc(db, 'subscriptions', id);
+    await deleteDoc(docRef);
+};
+
+// Customers
+export const deleteCustomer = async (id: string) => {
+    const docRef = doc(db, 'customers', id);
+    await deleteDoc(docRef);
+};
+
+// Payroll Payments
+const payrollPaymentsRef = collection(db, 'payroll_payments');
+
+export const addPayrollPayment = async (payment: any) => {
+    const { id, ...data } = payment;
+    return await addDoc(payrollPaymentsRef, cleanData(data));
 };
 
 export const checkFirebaseConnection = async () => {
@@ -194,3 +214,4 @@ export const checkFirebaseConnection = async () => {
         return { success: false, error: error.message || error };
     }
 };
+

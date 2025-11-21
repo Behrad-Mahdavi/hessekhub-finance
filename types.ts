@@ -121,6 +121,18 @@ export interface Employee {
   joinDate: string;
 }
 
+export interface PayrollPayment {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  date: string;
+  hoursWorked: number;
+  totalAmount: number;
+  paymentAccountId: string;
+  paymentAccountName: string;
+  notes?: string;
+}
+
 export interface FinancialSummary {
   totalRevenue: number;
   totalExpenses: number;

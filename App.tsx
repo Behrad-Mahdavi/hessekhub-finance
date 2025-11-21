@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
-import { Account, PurchaseRequest, SaleRecord, JournalEntry, RevenueStream, TransactionStatus, UserRole, JournalLine, SubscriptionStatus, AccountType, Employee, Customer, Subscription } from './types';
+import { Account, PurchaseRequest, SaleRecord, JournalEntry, RevenueStream, TransactionStatus, UserRole, JournalLine, SubscriptionStatus, AccountType, Employee, Customer, Subscription, PayrollPayment } from './types';
 import { toPersianDate } from './utils';
 import Dashboard from './components/Dashboard';
 import Expenses from './components/Expenses';
@@ -29,6 +29,9 @@ import {
   updateCustomer as firestoreUpdateCustomer,
   addSubscription as firestoreAddSubscription,
   updateSubscription as firestoreUpdateSubscription,
+  addPayrollPayment as firestoreAddPayrollPayment,
+  deleteCustomer as firestoreDeleteCustomer,
+  deleteSubscription as firestoreDeleteSubscription,
   checkFirebaseConnection
 } from './services/firestore';
 
@@ -71,6 +74,7 @@ const App: React.FC = () => {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [payrollPayments, setPayrollPayments] = useState<PayrollPayment[]>([]);
   const [useFirebase, setUseFirebase] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState<'checking' | 'connected' | 'error'>('checking');
   const [connectionError, setConnectionError] = useState<string>('');
@@ -107,6 +111,7 @@ const App: React.FC = () => {
       subscribeToCollection<Employee>('employees', setEmployees);
       subscribeToCollection<Customer>('customers', setCustomers);
       subscribeToCollection<Subscription>('subscriptions', setSubscriptions);
+      subscribeToCollection<PayrollPayment>('payroll_payments', setPayrollPayments);
 
       console.log('Subscriptions established');
       setUseFirebase(true);
@@ -378,68 +383,89 @@ const App: React.FC = () => {
   };
 
 
-  const handlePaySalary = async (emp: Employee, amount: number, date: string) => {
-    // 1. Create Expense Transaction
-    const salaryExpenseAccount = accounts.find(a => a.code === '5050')!;
-    const bankAccount = accounts.find(a => a.code === '1020')!;
-
-    // 3. Journal Entry
-    const newJournal: JournalEntry = {
-      id: `JRN-${Math.floor(Math.random() * 100000)}`,
-      date: toPersianDate(new Date()),
-      description: `پرداخت حقوق: ${emp.fullName}`,
-      lines: [
-        { accountId: salaryExpenseAccount.id, accountName: salaryExpenseAccount.name, debit: amount, credit: 0 },
-        { accountId: bankAccount.id, accountName: bankAccount.name, debit: 0, credit: amount }
-      ]
-    };
-
-    // 4. Add to Purchases (Expenses) for consistency in reporting
-    const salaryPurchase: PurchaseRequest = {
-      id: `PAY-${Math.floor(Math.random() * 10000)}`,
-      requester: 'سیستم حقوق',
-      amount: amount,
-      category: 'هزینه حقوق و دستمزد',
-      supplier: emp.fullName,
-      description: `حقوق ماهانه - ${emp.role}`,
-      status: TransactionStatus.APPROVED,
-      date: toPersianDate(new Date())
-    };
-
+  const handlePaySalary = async (payment: PayrollPayment) => {
     if (useFirebase) {
       try {
-        // 2. Update Balances
-        await firestoreUpdateAccount(salaryExpenseAccount.id, {
-          balance: salaryExpenseAccount.balance + amount
-        });
-        await firestoreUpdateAccount(bankAccount.id, {
-          balance: bankAccount.balance - amount
-        });
+        // 1. Add Payroll Payment Record
+        await firestoreAddPayrollPayment(payment);
+        setPayrollPayments(prev => [payment, ...prev]);
+
+        // 2. Update Account Balance (Credit Asset Account)
+        const paymentAccount = accounts.find(a => a.id === payment.paymentAccountId);
+        if (paymentAccount) {
+          await firestoreUpdateAccount(payment.paymentAccountId, {
+            balance: paymentAccount.balance - payment.totalAmount
+          });
+          setAccounts(prev => prev.map(a =>
+            a.id === payment.paymentAccountId ? { ...a, balance: a.balance - payment.totalAmount } : a
+          ));
+        }
+
+        // 3. Create Journal Entry
+        const salaryExpenseAccount = accounts.find(a => a.code === '5050'); // Salary Expense
+
+        const newJournal: JournalEntry = {
+          id: `JRN-${Math.floor(Math.random() * 100000)}`,
+          date: payment.date,
+          description: `پرداخت حقوق: ${payment.employeeName} - ${payment.notes || ''}`,
+          lines: [
+            {
+              accountId: salaryExpenseAccount?.id || '',
+              accountName: salaryExpenseAccount?.name || 'هزینه حقوق',
+              debit: payment.totalAmount,
+              credit: 0
+            },
+            {
+              accountId: payment.paymentAccountId,
+              accountName: payment.paymentAccountName,
+              debit: 0,
+              credit: payment.totalAmount
+            }
+          ]
+        };
+
         await firestoreAddJournal(newJournal);
-        await firestoreAddPurchase(salaryPurchase);
+        setJournals(prev => [newJournal, ...prev]);
         toast.success('حقوق با موفقیت پرداخت شد');
+
       } catch (error) {
-        console.error('Firebase error, using local state:', error);
-        setUseFirebase(false);
-        // Local Fallback
-        setAccounts(prev => prev.map(acc => {
-          if (acc.id === salaryExpenseAccount.id) return { ...acc, balance: acc.balance + amount };
-          if (acc.id === bankAccount.id) return { ...acc, balance: acc.balance - amount };
-          return acc;
-        }));
-        setJournals(prev => [...prev, newJournal]);
-        setPurchases(prev => [salaryPurchase, ...prev]);
-        toast.success('حقوق پرداخت شد (ذخیره محلی)');
+        console.error("Error paying salary:", error);
+        toast.error('خطا در پرداخت حقوق');
       }
     } else {
-      setAccounts(prev => prev.map(acc => {
-        if (acc.id === salaryExpenseAccount.id) return { ...acc, balance: acc.balance + amount };
-        if (acc.id === bankAccount.id) return { ...acc, balance: acc.balance - amount };
-        return acc;
-      }));
-      setJournals(prev => [...prev, newJournal]);
-      setPurchases(prev => [salaryPurchase, ...prev]);
-      toast.success('حقوق پرداخت شد (محلی)');
+      // Local fallback (simplified)
+      setPayrollPayments(prev => [payment, ...prev]);
+      toast.success('پرداخت حقوق ثبت شد (محلی)');
+    }
+  };
+
+  const handleDeleteCustomer = async (customerId: string) => {
+    if (confirm('آیا از حذف این مشتری و تمام اشتراک‌های او اطمینان دارید؟ این عملیات غیرقابل بازگشت است.')) {
+      if (useFirebase) {
+        try {
+          // 1. Delete Customer
+          await firestoreDeleteCustomer(customerId);
+
+          // 2. Delete Associated Subscriptions
+          const customerSubs = subscriptions.filter(s => s.customerId === customerId);
+          for (const sub of customerSubs) {
+            await firestoreDeleteSubscription(sub.id);
+          }
+
+          // 3. Update Local State
+          setCustomers(prev => prev.filter(c => c.id !== customerId));
+          setSubscriptions(prev => prev.filter(s => s.customerId !== customerId));
+
+          toast.success('مشتری و اشتراک‌های او با موفقیت حذف شدند');
+        } catch (error) {
+          console.error("Error deleting customer:", error);
+          toast.error('خطا در حذف مشتری');
+        }
+      } else {
+        setCustomers(prev => prev.filter(c => c.id !== customerId));
+        setSubscriptions(prev => prev.filter(s => s.customerId !== customerId));
+        toast.success('مشتری حذف شد (محلی)');
+      }
     }
   };
 
@@ -907,6 +933,8 @@ const App: React.FC = () => {
         return (
           <Payroll
             employees={employees}
+            accounts={accounts}
+            payrollPayments={payrollPayments}
             onAddEmployee={handleAddEmployee}
             onDeleteEmployee={handleDeleteEmployee}
             onPaySalary={handlePaySalary}
@@ -921,6 +949,7 @@ const App: React.FC = () => {
             accounts={accounts}
             onAddCustomer={handleAddCustomer}
             onUpdateCustomer={handleUpdateCustomer}
+            onDeleteCustomer={handleDeleteCustomer}
             onAddSubscription={handleAddSubscription}
           />
         );
