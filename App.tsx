@@ -677,7 +677,7 @@ const App: React.FC = () => {
           </form>
 
           <div className="mt-8 text-center">
-            <p className="text-xs text-slate-500">نسخه ۱.۲.۰ | طراحی شده با ❤️</p>
+            <p className="text-xs text-slate-500">نسخه ۱.۲.۰ |طراحی و توسعه : بهراد مهدوی </p>
           </div>
         </div>
       </div>

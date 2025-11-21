@@ -12,7 +12,7 @@ export const toPersianNumber = (num: number): string => {
 
 export const getDurationInMonths = (durationStr?: string): number => {
   if (!durationStr) return 1;
-  
+
   // Handle Weeks
   if (durationStr.includes('هفته')) {
     const match = durationStr.match(/(\d+)/);
@@ -23,4 +23,11 @@ export const getDurationInMonths = (durationStr?: string): number => {
   // Handle Months
   const match = durationStr.match(/(\d+)/);
   return match ? parseInt(match[0], 10) : 1;
+};
+
+export const formatPrice = (amount: number | string | undefined): string => {
+  if (!amount) return '';
+  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
+  if (isNaN(num)) return '';
+  return `${num.toLocaleString('fa-IR')} تومان`;
 };

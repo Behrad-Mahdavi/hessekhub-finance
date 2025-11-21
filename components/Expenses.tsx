@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Account, AccountType, PurchaseRequest, TransactionStatus, UserRole } from '../types';
-import { toPersianDate } from '../utils';
+import { toPersianDate, formatPrice } from '../utils';
 import { Plus, Check, X, FileText, Upload, Image as ImageIcon, Trash2, Search, Filter, BarChart3, Scale, CreditCard } from 'lucide-react';
 
 interface ExpensesProps {
@@ -188,6 +188,7 @@ const Expenses: React.FC<ExpensesProps> = ({ accounts, purchases, onAddPurchase,
                 className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all dir-ltr text-left"
                 placeholder="0"
               />
+              {formData.amount && <p className="text-xs text-indigo-600 mt-1 font-bold">{formatPrice(formData.amount)}</p>}
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">دسته‌بندی هزینه</label>
