@@ -388,7 +388,7 @@ const App: React.FC = () => {
       try {
         // 1. Add Payroll Payment Record
         await firestoreAddPayrollPayment(payment);
-        setPayrollPayments(prev => [payment, ...prev]);
+        // setPayrollPayments handled by subscription
 
         // 2. Update Account Balance (Credit Asset Account)
         const paymentAccount = accounts.find(a => a.id === payment.paymentAccountId);
@@ -396,9 +396,7 @@ const App: React.FC = () => {
           await firestoreUpdateAccount(payment.paymentAccountId, {
             balance: paymentAccount.balance - payment.totalAmount
           });
-          setAccounts(prev => prev.map(a =>
-            a.id === payment.paymentAccountId ? { ...a, balance: a.balance - payment.totalAmount } : a
-          ));
+          // setAccounts handled by subscription
         }
 
         // 3. Create Journal Entry
@@ -425,7 +423,8 @@ const App: React.FC = () => {
         };
 
         await firestoreAddJournal(newJournal);
-        setJournals(prev => [newJournal, ...prev]);
+        // setJournals handled by subscription
+
         toast.success('حقوق با موفقیت پرداخت شد');
 
       } catch (error) {
@@ -452,9 +451,9 @@ const App: React.FC = () => {
             await firestoreDeleteSubscription(sub.id);
           }
 
-          // 3. Update Local State
-          setCustomers(prev => prev.filter(c => c.id !== customerId));
-          setSubscriptions(prev => prev.filter(s => s.customerId !== customerId));
+          // 3. Update Local State - Handled by subscription
+          // setCustomers(prev => prev.filter(c => c.id !== customerId));
+          // setSubscriptions(prev => prev.filter(s => s.customerId !== customerId));
 
           toast.success('مشتری و اشتراک‌های او با موفقیت حذف شدند');
         } catch (error) {
