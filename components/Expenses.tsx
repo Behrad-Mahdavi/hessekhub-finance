@@ -13,6 +13,7 @@ interface ExpensesProps {
 const Expenses: React.FC<ExpensesProps> = ({ purchases, onAddPurchase, onApprovePurchase, onRejectPurchase }) => {
   const [showForm, setShowForm] = useState(false);
   const [fileName, setFileName] = useState<string>('');
+  const [selectedPurchase, setSelectedPurchase] = useState<PurchaseRequest | null>(null);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -333,14 +334,14 @@ const Expenses: React.FC<ExpensesProps> = ({ purchases, onAddPurchase, onApprove
                   <td className="p-4">
                     <span
                       className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${p.status === TransactionStatus.APPROVED
-                          ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
-                          : p.status === TransactionStatus.REJECTED
-                            ? 'bg-rose-100 text-rose-700 border border-rose-200'
-                            : 'bg-amber-100 text-amber-700 border border-amber-200'
+                        ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                        : p.status === TransactionStatus.REJECTED
+                          ? 'bg-rose-100 text-rose-700 border border-rose-200'
+                          : 'bg-amber-100 text-amber-700 border border-amber-200'
                         }`}
                     >
                       <span className={`w-1.5 h-1.5 rounded-full ${p.status === TransactionStatus.APPROVED ? 'bg-emerald-600' :
-                          p.status === TransactionStatus.REJECTED ? 'bg-rose-600' : 'bg-amber-600'
+                        p.status === TransactionStatus.REJECTED ? 'bg-rose-600' : 'bg-amber-600'
                         }`}></span>
                       {getStatusLabel(p.status)}
                     </span>
@@ -365,7 +366,11 @@ const Expenses: React.FC<ExpensesProps> = ({ purchases, onAddPurchase, onApprove
                           </button>
                         </>
                       ) : (
-                        <button className="p-2 text-slate-400 hover:text-indigo-600 transition-colors" title="مشاهده جزئیات">
+                        <button
+                          onClick={() => setSelectedPurchase(p)}
+                          className="p-2 text-slate-400 hover:text-indigo-600 transition-colors"
+                          title="مشاهده جزئیات"
+                        >
                           <FileText className="w-4 h-4" />
                         </button>
                       )}
@@ -387,7 +392,103 @@ const Expenses: React.FC<ExpensesProps> = ({ purchases, onAddPurchase, onApprove
           </table>
         </div>
       </div>
-    </div>
+
+
+      {/* Details Modal */}
+      {
+        selectedPurchase && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-scale-in">
+              <div className="bg-slate-50 p-4 border-b border-slate-100 flex justify-between items-center">
+                <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-indigo-600" />
+                  جزئیات درخواست خرید
+                </h3>
+                <button
+                  onClick={() => setSelectedPurchase(null)}
+                  className="p-1 hover:bg-slate-200 rounded-full transition-colors text-slate-500"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-4">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-xs text-slate-500 mb-1">تامین کننده</p>
+                    <p className="font-bold text-slate-800 text-lg">{selectedPurchase.supplier}</p>
+                  </div>
+                  <span
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${selectedPurchase.status === TransactionStatus.APPROVED
+                      ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                      : selectedPurchase.status === TransactionStatus.REJECTED
+                        ? 'bg-rose-100 text-rose-700 border border-rose-200'
+                        : 'bg-amber-100 text-amber-700 border border-amber-200'
+                      }`}
+                  >
+                    {getStatusLabel(selectedPurchase.status)}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                  <div>
+                    <p className="text-xs text-slate-500 mb-1">مبلغ کل</p>
+                    <p className="font-bold text-slate-800 dir-ltr text-right">{selectedPurchase.amount.toLocaleString('fa-IR')} تومان</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500 mb-1">تاریخ ثبت</p>
+                    <p className="font-bold text-slate-800">{selectedPurchase.date}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500 mb-1">دسته‌بندی</p>
+                    <p className="font-medium text-slate-700">{selectedPurchase.category}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500 mb-1">درخواست کننده</p>
+                    <p className="font-medium text-slate-700">{selectedPurchase.requester}</p>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-xs text-slate-500 mb-1">توضیحات</p>
+                  <p className="text-sm text-slate-700 bg-slate-50 p-3 rounded-xl border border-slate-100 leading-relaxed">
+                    {selectedPurchase.description || 'بدون توضیحات'}
+                  </p>
+                </div>
+
+                {selectedPurchase.quantity && (
+                  <div className="flex items-center gap-2 bg-amber-50 p-3 rounded-xl border border-amber-100 text-amber-800">
+                    <Scale className="w-4 h-4" />
+                    <span className="text-sm font-medium">
+                      مقدار مصرفی: <span className="font-bold">{selectedPurchase.quantity} {selectedPurchase.unit}</span>
+                    </span>
+                  </div>
+                )}
+
+                {selectedPurchase.imageUrl && (
+                  <div>
+                    <p className="text-xs text-slate-500 mb-2">تصویر فاکتور</p>
+                    <div className="h-32 bg-slate-100 rounded-xl border-2 border-dashed border-slate-200 flex items-center justify-center text-slate-400 gap-2">
+                      <ImageIcon className="w-5 h-5" />
+                      <span className="text-sm">تصویر ضمیمه شده</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end">
+                <button
+                  onClick={() => setSelectedPurchase(null)}
+                  className="px-6 py-2 bg-white border border-slate-300 text-slate-700 rounded-xl hover:bg-slate-50 font-medium transition-colors shadow-sm"
+                >
+                  بستن
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      }
+    </div >
   );
 };
 
