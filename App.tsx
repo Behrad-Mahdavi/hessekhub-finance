@@ -297,6 +297,10 @@ const App: React.FC = () => {
         const customer = customers.find(c => c.id === subscription.customerId);
         if (customer) {
           await firestoreUpdateCustomer(customer.id, { activeSubscriptionId: subscription.id });
+          // Update local state as well
+          setCustomers(prev => prev.map(c =>
+            c.id === subscription.customerId ? { ...c, activeSubscriptionId: subscription.id } : c
+          ));
         }
 
         // Accounting Logic (similar to handleAddSale)
