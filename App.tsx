@@ -449,9 +449,30 @@ const App: React.FC = () => {
         const revenueAccount = accounts.find(a => a.code === '4010')!; // Cafe Revenue
         const discountAccount = accounts.find(a => a.code === '5110')!; // Discounts
         const refundAccount = accounts.find(a => a.code === '5120')!; // Returns
+        const cashOnHandAccount = accounts.find(a => a.code === '1010')!; // Cash on Hand
 
-        // Debit Cash (Net Amount)
-        newLines.push({ accountId: cashAccount.id, accountName: cashAccount.name, debit: sale.amount, credit: 0 });
+        // Determine Receiving Bank Account (POS/C2C)
+        let bankAccount = accounts.find(a => a.code === '1020')!;
+        if (sale.paymentAccountId) {
+          const selected = accounts.find(a => a.id === sale.paymentAccountId);
+          if (selected) bankAccount = selected;
+        }
+
+        // Calculate Split Amounts
+        const cashReceived = sale.cashAmount || 0;
+        const c2cReceived = sale.cardToCardAmount || 0;
+        const posReceived = sale.amount - cashReceived - c2cReceived; // Remaining is POS
+
+        // 1. Debit Cash on Hand
+        if (cashReceived > 0) {
+          newLines.push({ accountId: cashOnHandAccount.id, accountName: cashOnHandAccount.name, debit: cashReceived, credit: 0 });
+        }
+
+        // 2. Debit Bank Account (POS + C2C)
+        const totalBankDeposit = posReceived + c2cReceived;
+        if (totalBankDeposit > 0) {
+          newLines.push({ accountId: bankAccount.id, accountName: bankAccount.name, debit: totalBankDeposit, credit: 0 });
+        }
 
         // Debit Discounts (if any)
         if (sale.discount && sale.discount > 0) {
@@ -469,7 +490,7 @@ const App: React.FC = () => {
         const journalEntry: JournalEntry = {
           id: `JRN-${Math.floor(Math.random() * 100000)}`,
           date: sale.date,
-          description: `فروش: ${sale.details}`,
+          description: `فروش: ${sale.details} ${sale.cardToCardSender ? `(واریز: ${sale.cardToCardSender})` : ''}`,
           referenceId: sale.id,
           lines: newLines
         };
@@ -478,10 +499,15 @@ const App: React.FC = () => {
           try {
             await firestoreAddSale(sale);
             await firestoreAddJournal(journalEntry);
+
             // Update Balances
-            await firestoreUpdateAccount(cashAccount.id, {
-              balance: cashAccount.balance + sale.amount
-            });
+            if (cashReceived > 0) {
+              await firestoreUpdateAccount(cashOnHandAccount.id, { balance: cashOnHandAccount.balance + cashReceived });
+            }
+            if (totalBankDeposit > 0) {
+              await firestoreUpdateAccount(bankAccount.id, { balance: bankAccount.balance + totalBankDeposit });
+            }
+
             await firestoreUpdateAccount(revenueAccount.id, {
               balance: revenueAccount.balance + (sale.grossAmount || 0)
             });
@@ -502,7 +528,8 @@ const App: React.FC = () => {
             setSales(prev => [sale, ...prev]);
             setJournals(prev => [...prev, journalEntry]);
             setAccounts(prev => prev.map(acc => {
-              if (acc.id === cashAccount.id) return { ...acc, balance: acc.balance + sale.amount };
+              if (acc.id === cashOnHandAccount.id) return { ...acc, balance: acc.balance + cashReceived };
+              if (acc.id === bankAccount.id) return { ...acc, balance: acc.balance + totalBankDeposit };
               if (acc.id === revenueAccount.id) return { ...acc, balance: acc.balance + (sale.grossAmount || 0) };
               if (sale.discount && sale.discount > 0 && acc.id === discountAccount.id) return { ...acc, balance: acc.balance + sale.discount };
               if (sale.refund && sale.refund > 0 && acc.id === refundAccount.id) return { ...acc, balance: acc.balance + sale.refund };
@@ -514,7 +541,8 @@ const App: React.FC = () => {
           setSales(prev => [sale, ...prev]);
           setJournals(prev => [...prev, journalEntry]);
           setAccounts(prev => prev.map(acc => {
-            if (acc.id === cashAccount.id) return { ...acc, balance: acc.balance + sale.amount };
+            if (acc.id === cashOnHandAccount.id) return { ...acc, balance: acc.balance + cashReceived };
+            if (acc.id === bankAccount.id) return { ...acc, balance: acc.balance + totalBankDeposit };
             if (acc.id === revenueAccount.id) return { ...acc, balance: acc.balance + (sale.grossAmount || 0) };
             if (sale.discount && sale.discount > 0 && acc.id === discountAccount.id) return { ...acc, balance: acc.balance + sale.discount };
             if (sale.refund && sale.refund > 0 && acc.id === refundAccount.id) return { ...acc, balance: acc.balance + sale.refund };
@@ -715,13 +743,13 @@ const App: React.FC = () => {
         return (
           <Sales
             sales={sales}
+            accounts={accounts}
             onAddSale={handleAddSale}
             onCancelSubscription={handleCancelSubscription}
-            onDeleteSale={handleDeleteSale}
+            onDeleteSale={handleDeleteSale} // Passed handler
             userRole={UserRole.ADMIN} // Role removed, passing dummy
           />
-        );
-      case 'ledger':
+        ); case 'ledger':
         return (
           <Ledger journals={journals} />
         );

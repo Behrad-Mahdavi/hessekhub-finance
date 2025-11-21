@@ -1,17 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { SaleRecord, RevenueStream, UserRole, SubscriptionStatus } from '../types';
+import { SaleRecord, RevenueStream, UserRole, SubscriptionStatus, Account, AccountType } from '../types';
 import { toPersianDate, formatPrice } from '../utils';
-import { Coffee, Users, Activity, PlusCircle, Clock, Calculator, RefreshCw, Ban, AlertTriangle, User, Trash2 } from 'lucide-react';
+import { Coffee, Users, Activity, PlusCircle, Clock, Calculator, RefreshCw, Ban, AlertTriangle, User, Trash2, CreditCard, Banknote, ChevronDown, ChevronUp } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 interface SalesProps {
     sales: SaleRecord[];
+    accounts: Account[];
     onAddSale: (s: SaleRecord) => void;
     onCancelSubscription?: (id: string, refundAmount: number) => void;
     onDeleteSale: (id: string) => void;
     userRole: UserRole;
 }
 
-const Sales: React.FC<SalesProps> = ({ sales, onAddSale, onCancelSubscription, onDeleteSale, userRole }) => {
+const Sales: React.FC<SalesProps> = ({ sales, accounts, onAddSale, onCancelSubscription, onDeleteSale, userRole }) => {
     const [activeTab, setActiveTab] = useState<RevenueStream>(RevenueStream.CAFE);
 
     // Common State
@@ -31,6 +33,13 @@ const Sales: React.FC<SalesProps> = ({ sales, onAddSale, onCancelSubscription, o
     const [showCancelModal, setShowCancelModal] = useState<string | null>(null); // ID of subscription to cancel
     const [refundAmount, setRefundAmount] = useState('0');
 
+    // Payment Details State
+    const [paymentAccountId, setPaymentAccountId] = useState('');
+    const [showPaymentDetails, setShowPaymentDetails] = useState(false);
+    const [cashAmount, setCashAmount] = useState('');
+    const [cardToCardAmount, setCardToCardAmount] = useState('');
+    const [cardToCardSender, setCardToCardSender] = useState('');
+
     // Reset form when tab changes
     useEffect(() => {
         setSimpleAmount('');
@@ -40,6 +49,11 @@ const Sales: React.FC<SalesProps> = ({ sales, onAddSale, onCancelSubscription, o
         setDetails('');
         setCustomerName('');
         setShowCancelModal(null);
+        setPaymentAccountId('');
+        setShowPaymentDetails(false);
+        setCashAmount('');
+        setCardToCardAmount('');
+        setCardToCardSender('');
     }, [activeTab]);
 
     const calculateNet = () => {
@@ -59,6 +73,10 @@ const Sales: React.FC<SalesProps> = ({ sales, onAddSale, onCancelSubscription, o
             date: toPersianDate(new Date()),
             details: details || getDefaultDetails(activeTab),
             amount: 0,
+            paymentAccountId: paymentAccountId || undefined,
+            cashAmount: cashAmount ? parseFloat(cashAmount) : undefined,
+            cardToCardAmount: cardToCardAmount ? parseFloat(cardToCardAmount) : undefined,
+            cardToCardSender: cardToCardSender || undefined,
         };
 
         if (activeTab === RevenueStream.CAFE) {
@@ -66,6 +84,21 @@ const Sales: React.FC<SalesProps> = ({ sales, onAddSale, onCancelSubscription, o
             const d = parseFloat(discount) || 0;
             const r = parseFloat(refund) || 0;
             finalAmount = g - d - r;
+
+            // Validation for Split Payment
+            const cash = parseFloat(cashAmount) || 0;
+            const c2c = parseFloat(cardToCardAmount) || 0;
+
+            if (cash + c2c > finalAmount) {
+                toast.error('مجموع مبالغ نقد و کارت به کارت نمی‌تواند بیشتر از مبلغ خالص باشد');
+                return;
+            }
+
+            const posAmount = finalAmount - cash - c2c;
+            if (posAmount > 0 && !paymentAccountId) {
+                toast.error('لطفاً حساب دریافت کننده (کارتخوان) را انتخاب کنید');
+                return;
+            }
 
             saleRecord.amount = finalAmount;
             saleRecord.grossAmount = g;
@@ -91,6 +124,11 @@ const Sales: React.FC<SalesProps> = ({ sales, onAddSale, onCancelSubscription, o
         setRefund('');
         setDetails('');
         setCustomerName('');
+        setPaymentAccountId('');
+        setCashAmount('');
+        setCardToCardAmount('');
+        setCardToCardSender('');
+        setShowPaymentDetails(false);
     };
 
     const handleRenewClick = (sub: SaleRecord) => {
@@ -205,6 +243,74 @@ const Sales: React.FC<SalesProps> = ({ sales, onAddSale, onCancelSubscription, o
                                             placeholder="0"
                                         />
                                     </div>
+                                </div>
+
+                                {/* Payment Details Section */}
+                                <div className="border-t border-slate-100 pt-4">
+                                    <div className="mb-4">
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">حساب دریافت کننده (کارتخوان)</label>
+                                        <div className="relative">
+                                            <select
+                                                value={paymentAccountId}
+                                                onChange={(e) => setPaymentAccountId(e.target.value)}
+                                                className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none appearance-none bg-white"
+                                            >
+                                                <option value="">انتخاب حساب متصل به کارتخوان...</option>
+                                                {accounts.filter(a => a.type === AccountType.ASSET && a.code !== '1010').map(acc => (
+                                                    <option key={acc.id} value={acc.id}>{acc.name}</option>
+                                                ))}
+                                            </select>
+                                            <CreditCard className="absolute left-2 top-2.5 w-4 h-4 text-slate-400" />
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPaymentDetails(!showPaymentDetails)}
+                                        className="flex items-center gap-2 text-sm text-indigo-600 font-bold hover:text-indigo-700 transition-colors w-full"
+                                    >
+                                        {showPaymentDetails ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                        جزئیات بیشتر پرداخت (نقد / کارت به کارت)
+                                    </button>
+
+                                    {showPaymentDetails && (
+                                        <div className="mt-3 space-y-3 bg-indigo-50 p-3 rounded-xl animate-fade-in">
+                                            <div>
+                                                <label className="block text-xs font-bold text-indigo-700 mb-1 flex items-center gap-1">
+                                                    <Banknote className="w-3 h-3" /> مبلغ دریافتی نقد
+                                                </label>
+                                                <input
+                                                    type="number"
+                                                    value={cashAmount}
+                                                    onChange={(e) => setCashAmount(e.target.value)}
+                                                    className="w-full p-2 border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none dir-ltr text-left"
+                                                    placeholder="0"
+                                                />
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div>
+                                                    <label className="block text-xs font-bold text-indigo-700 mb-1">مبلغ کارت به کارت</label>
+                                                    <input
+                                                        type="number"
+                                                        value={cardToCardAmount}
+                                                        onChange={(e) => setCardToCardAmount(e.target.value)}
+                                                        className="w-full p-2 border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none dir-ltr text-left"
+                                                        placeholder="0"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-indigo-700 mb-1">نام واریز کننده</label>
+                                                    <input
+                                                        type="text"
+                                                        value={cardToCardSender}
+                                                        onChange={(e) => setCardToCardSender(e.target.value)}
+                                                        className="w-full p-2 border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                        placeholder="مثلاً: علی محمدی"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="pt-2 border-t border-slate-200 flex justify-between items-center">
                                     <span className="text-sm font-bold text-slate-700">خالص دریافتی:</span>
@@ -417,53 +523,55 @@ const Sales: React.FC<SalesProps> = ({ sales, onAddSale, onCancelSubscription, o
                         </div>
                     </div>
                 </div>
-            </div>
+            </div >
 
             {/* Cancel Modal */}
-            {showCancelModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-fade-in-up">
-                        <div className="p-6 text-center">
-                            <div className="w-16 h-16 bg-rose-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <AlertTriangle className="w-8 h-8 text-rose-600" />
-                            </div>
-                            <h3 className="text-xl font-bold text-slate-800 mb-2">لغو اشتراک</h3>
-                            <p className="text-slate-500 text-sm mb-6">
-                                آیا از لغو این اشتراک اطمینان دارید؟<br />
-                                در صورت نیاز به بازگشت وجه، مبلغ را وارد کنید.
-                            </p>
+            {
+                showCancelModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+                        <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-fade-in-up">
+                            <div className="p-6 text-center">
+                                <div className="w-16 h-16 bg-rose-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <AlertTriangle className="w-8 h-8 text-rose-600" />
+                                </div>
+                                <h3 className="text-xl font-bold text-slate-800 mb-2">لغو اشتراک</h3>
+                                <p className="text-slate-500 text-sm mb-6">
+                                    آیا از لغو این اشتراک اطمینان دارید؟<br />
+                                    در صورت نیاز به بازگشت وجه، مبلغ را وارد کنید.
+                                </p>
 
-                            <div className="bg-slate-50 p-4 rounded-xl text-right mb-6 border border-slate-200">
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">مبلغ عودت وجه (تومان)</label>
-                                <input
-                                    type="number"
-                                    value={refundAmount}
-                                    onChange={(e) => setRefundAmount(e.target.value)}
-                                    className="w-full p-3 bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-rose-500 dir-ltr text-left font-bold"
-                                />
-                                <p className="text-xs text-slate-400 mt-2">* این مبلغ از "پیش‌دریافت‌ها" کسر و از "صندوق" پرداخت می‌شود.</p>
-                            </div>
+                                <div className="bg-slate-50 p-4 rounded-xl text-right mb-6 border border-slate-200">
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">مبلغ عودت وجه (تومان)</label>
+                                    <input
+                                        type="number"
+                                        value={refundAmount}
+                                        onChange={(e) => setRefundAmount(e.target.value)}
+                                        className="w-full p-3 bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-rose-500 dir-ltr text-left font-bold"
+                                    />
+                                    <p className="text-xs text-slate-400 mt-2">* این مبلغ از "پیش‌دریافت‌ها" کسر و از "صندوق" پرداخت می‌شود.</p>
+                                </div>
 
-                            <div className="flex gap-3">
-                                <button
-                                    onClick={() => setShowCancelModal(null)}
-                                    className="flex-1 py-3 text-slate-600 hover:bg-slate-100 rounded-xl font-bold transition-colors"
-                                >
-                                    انصراف
-                                </button>
-                                <button
-                                    onClick={handleConfirmCancel}
-                                    className="flex-1 py-3 bg-rose-600 text-white hover:bg-rose-700 rounded-xl font-bold shadow-lg shadow-rose-200 transition-colors"
-                                >
-                                    تایید لغو اشتراک
-                                </button>
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={() => setShowCancelModal(null)}
+                                        className="flex-1 py-3 text-slate-600 hover:bg-slate-100 rounded-xl font-bold transition-colors"
+                                    >
+                                        انصراف
+                                    </button>
+                                    <button
+                                        onClick={handleConfirmCancel}
+                                        className="flex-1 py-3 bg-rose-600 text-white hover:bg-rose-700 rounded-xl font-bold shadow-lg shadow-rose-200 transition-colors"
+                                    >
+                                        تایید لغو اشتراک
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
-        </div>
+        </div >
     );
 };
 
