@@ -17,8 +17,10 @@ import {
   deleteAccount as firestoreDeleteAccount,
   addPurchase as firestoreAddPurchase,
   updatePurchase as firestoreUpdatePurchase,
+  deletePurchase as firestoreDeletePurchase,
   addSale as firestoreAddSale,
   updateSale as firestoreUpdateSale,
+  deleteSale as firestoreDeleteSale,
   addJournal as firestoreAddJournal,
   addEmployee as firestoreAddEmployee,
   deleteEmployee as firestoreDeleteEmployee,
@@ -186,6 +188,23 @@ const App: React.FC = () => {
     } else {
       setAccounts(prev => prev.filter(acc => acc.id !== id));
       toast.success('حساب با موفقیت حذف شد (محلی)');
+    }
+  };
+
+  const handleDeletePurchase = async (id: string) => {
+    if (useFirebase) {
+      try {
+        await firestoreDeletePurchase(id);
+        toast.success('هزینه با موفقیت حذف شد');
+      } catch (error) {
+        console.error('Firebase error, using local state:', error);
+        setUseFirebase(false);
+        setPurchases(prev => prev.filter(p => p.id !== id));
+        toast.success('هزینه حذف شد (ذخیره محلی)');
+      }
+    } else {
+      setPurchases(prev => prev.filter(p => p.id !== id));
+      toast.success('هزینه با موفقیت حذف شد (محلی)');
     }
   };
 
@@ -537,6 +556,23 @@ const App: React.FC = () => {
     }
   };
 
+  const handleDeleteSale = async (id: string) => {
+    if (useFirebase) {
+      try {
+        await firestoreDeleteSale(id);
+        toast.success('تراکنش فروش با موفقیت حذف شد');
+      } catch (error) {
+        console.error('Firebase error, using local state:', error);
+        setUseFirebase(false);
+        setSales(prev => prev.filter(s => s.id !== id));
+        toast.success('تراکنش فروش حذف شد (ذخیره محلی)');
+      }
+    } else {
+      setSales(prev => prev.filter(s => s.id !== id));
+      toast.success('تراکنش فروش با موفقیت حذف شد (محلی)');
+    }
+  };
+
   const handleCancelSubscription = async (id: string, refundAmount: number) => {
     const sale = sales.find(s => s.id === id);
     if (!sale || sale.stream !== RevenueStream.SUBSCRIPTION) return;
@@ -626,6 +662,60 @@ const App: React.FC = () => {
   const handleNavClick = (view: View) => {
     setCurrentView(view);
     setIsMobileMenuOpen(false);
+  };
+
+  const renderContent = () => {
+    switch (currentView) {
+      case 'dashboard':
+        return (
+          <Dashboard accounts={accounts} sales={sales} purchases={purchases} />
+        );
+      case 'expenses':
+        return (
+          <Expenses
+            accounts={accounts}
+            purchases={purchases}
+            onAddPurchase={handleAddPurchase}
+            onApprovePurchase={handleApprovePurchase}
+            onRejectPurchase={handleRejectPurchase}
+            onDeletePurchase={handleDeletePurchase}
+          />
+        );
+      case 'sales':
+        return (
+          <Sales
+            sales={sales}
+            onAddSale={handleAddSale}
+            onCancelSubscription={handleCancelSubscription}
+            onDeleteSale={handleDeleteSale}
+            userRole={UserRole.ADMIN} // Role removed, passing dummy
+          />
+        );
+      case 'ledger':
+        return (
+          <Ledger journals={journals} />
+        );
+      case 'settings':
+        return (
+          <Settings
+            accounts={accounts}
+            onAddAccount={handleAddAccount}
+            onUpdateAccount={handleUpdateAccount}
+            onDeleteAccount={handleDeleteAccount}
+          />
+        );
+      case 'payroll':
+        return (
+          <Payroll
+            employees={employees}
+            onAddEmployee={handleAddEmployee}
+            onDeleteEmployee={handleDeleteEmployee}
+            onPaySalary={handlePaySalary}
+          />
+        );
+      default:
+        return null;
+    }
   };
 
   if (isLoading) {
@@ -797,45 +887,9 @@ const App: React.FC = () => {
       )}
 
       {/* Main Content */}
+      {/* Main Content */}
       <main className="flex-1 overflow-auto relative pt-16 md:pt-0">
-        {currentView === 'dashboard' && (
-          <Dashboard accounts={accounts} sales={sales} purchases={purchases} />
-        )}
-        {currentView === 'expenses' && (
-          <Expenses
-            accounts={accounts}
-            purchases={purchases}
-            onAddPurchase={handleAddPurchase}
-            onApprovePurchase={handleApprovePurchase}
-            onRejectPurchase={handleRejectPurchase}
-          />
-        )}
-        {currentView === 'sales' && (
-          <Sales
-            sales={sales}
-            onAddSale={handleAddSale}
-            onCancelSubscription={handleCancelSubscription}
-          />
-        )}
-        {currentView === 'ledger' && (
-          <Ledger journals={journals} />
-        )}
-        {currentView === 'settings' && (
-          <Settings
-            accounts={accounts}
-            onAddAccount={handleAddAccount}
-            onUpdateAccount={handleUpdateAccount}
-            onDeleteAccount={handleDeleteAccount}
-          />
-        )}
-        {currentView === 'payroll' && (
-          <Payroll
-            employees={employees}
-            onAddEmployee={handleAddEmployee}
-            onDeleteEmployee={handleDeleteEmployee}
-            onPaySalary={handlePaySalary}
-          />
-        )}
+        {renderContent()}
       </main>
     </div>
   );

@@ -9,9 +9,10 @@ interface ExpensesProps {
   onAddPurchase: (p: PurchaseRequest) => void;
   onApprovePurchase: (id: string) => void;
   onRejectPurchase: (id: string) => void;
+  onDeletePurchase: (id: string) => void;
 }
 
-const Expenses: React.FC<ExpensesProps> = ({ accounts, purchases, onAddPurchase, onApprovePurchase, onRejectPurchase }) => {
+const Expenses: React.FC<ExpensesProps> = ({ accounts, purchases, onAddPurchase, onApprovePurchase, onRejectPurchase, onDeletePurchase }) => {
   const [showForm, setShowForm] = useState(false);
   const [fileName, setFileName] = useState<string>('');
   const [selectedPurchase, setSelectedPurchase] = useState<PurchaseRequest | null>(null);
@@ -389,13 +390,26 @@ const Expenses: React.FC<ExpensesProps> = ({ accounts, purchases, onAddPurchase,
                           </button>
                         </>
                       ) : (
-                        <button
-                          onClick={() => setSelectedPurchase(p)}
-                          className="p-2 text-slate-400 hover:text-indigo-600 transition-colors"
-                          title="مشاهده جزئیات"
-                        >
-                          <FileText className="w-4 h-4" />
-                        </button>
+                        <>
+                          <button
+                            onClick={() => setSelectedPurchase(p)}
+                            className="p-2 text-slate-400 hover:text-indigo-600 transition-colors"
+                            title="مشاهده جزئیات"
+                          >
+                            <FileText className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (window.confirm('آیا از حذف این هزینه اطمینان دارید؟')) {
+                                onDeletePurchase(p.id);
+                              }
+                            }}
+                            className="p-2 text-slate-400 hover:text-rose-600 transition-colors"
+                            title="حذف"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </>
                       )}
                     </div>
                   </td>

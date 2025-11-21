@@ -113,6 +113,11 @@ export const updatePurchase = async (id: string, data: Partial<PurchaseRequest>)
     await updateDoc(docRef, cleanData(data));
 };
 
+export const deletePurchase = async (id: string) => {
+    const docRef = doc(db, 'purchases', id);
+    await deleteDoc(docRef);
+};
+
 // Sales
 export const addSale = async (sale: SaleRecord) => {
     const { id, ...data } = sale;
@@ -122,6 +127,11 @@ export const addSale = async (sale: SaleRecord) => {
 export const updateSale = async (id: string, data: Partial<SaleRecord>) => {
     const docRef = doc(db, 'sales', id);
     await updateDoc(docRef, cleanData(data));
+};
+
+export const deleteSale = async (id: string) => {
+    const docRef = doc(db, 'sales', id);
+    await deleteDoc(docRef);
 };
 
 // Journals

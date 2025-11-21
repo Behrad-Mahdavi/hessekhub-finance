@@ -1,16 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { SaleRecord, RevenueStream, UserRole, SubscriptionStatus } from '../types';
 import { toPersianDate, formatPrice } from '../utils';
-import { Coffee, Users, Activity, PlusCircle, Clock, Calculator, RefreshCw, Ban, AlertTriangle, User } from 'lucide-react';
+import { Coffee, Users, Activity, PlusCircle, Clock, Calculator, RefreshCw, Ban, AlertTriangle, User, Trash2 } from 'lucide-react';
 
 interface SalesProps {
     sales: SaleRecord[];
     onAddSale: (s: SaleRecord) => void;
     onCancelSubscription?: (id: string, refundAmount: number) => void;
+    onDeleteSale: (id: string) => void;
     userRole: UserRole;
 }
 
-const Sales: React.FC<SalesProps> = ({ sales, onAddSale, onCancelSubscription, userRole }) => {
+const Sales: React.FC<SalesProps> = ({ sales, onAddSale, onCancelSubscription, onDeleteSale, userRole }) => {
     const [activeTab, setActiveTab] = useState<RevenueStream>(RevenueStream.CAFE);
 
     // Common State
@@ -367,6 +368,7 @@ const Sales: React.FC<SalesProps> = ({ sales, onAddSale, onCancelSubscription, u
                                         {activeTab === RevenueStream.SUBSCRIPTION && <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">وضعیت</th>}
                                         {activeTab === RevenueStream.CAFE && <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">ناخالص</th>}
                                         <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-left">دریافتی نقد</th>
+                                        <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-left">عملیات</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-50">
@@ -392,6 +394,19 @@ const Sales: React.FC<SalesProps> = ({ sales, onAddSale, onCancelSubscription, u
                                                 <td className="p-4 text-xs text-slate-500 font-mono">{s.grossAmount?.toLocaleString() || '-'}</td>
                                             )}
                                             <td className="p-4 text-sm font-bold text-emerald-600 text-left dir-ltr">+{s.amount.toLocaleString('fa-IR')}</td>
+                                            <td className="p-4 text-left">
+                                                <button
+                                                    onClick={() => {
+                                                        if (window.confirm('آیا از حذف این تراکنش اطمینان دارید؟')) {
+                                                            onDeleteSale(s.id);
+                                                        }
+                                                    }}
+                                                    className="p-2 text-slate-400 hover:text-rose-600 transition-colors"
+                                                    title="حذف"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </td>
                                         </tr>
                                     ))}
                                     {filteredSales.length === 0 && (
