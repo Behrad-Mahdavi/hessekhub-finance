@@ -13,7 +13,7 @@ interface ExpensesProps {
   onDeletePurchase: (id: string) => void;
 }
 
-const Expenses: React.FC<ExpensesProps> = ({ accounts, purchases, onAddPurchase, onApprovePurchase, onRejectPurchase, onDeletePurchase }) => {
+const Expenses: React.FC<ExpensesProps> = ({ accounts, purchases, suppliers, onAddPurchase, onApprovePurchase, onRejectPurchase, onDeletePurchase }) => {
   const [showForm, setShowForm] = useState(false);
   const [fileName, setFileName] = useState<string>('');
   const [selectedPurchase, setSelectedPurchase] = useState<PurchaseRequest | null>(null);
