@@ -12,6 +12,7 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ accounts, sales, purchases }) => {
+  const [daysRange, setDaysRange] = useState<number>(7);
 
 
   // 1. Calculate General Accounting KPIs
@@ -47,10 +48,10 @@ const Dashboard: React.FC<DashboardProps> = ({ accounts, sales, purchases }) => 
     { name: 'مشاوره', value: accounts.find(a => a.code === '4030')?.balance || 0 },
   ];
 
-  // Calculate Real-time Trend Data (Last 7 Days)
+  // Calculate Real-time Trend Data (Dynamic Range)
   const calculateTrendData = () => {
     const data = [];
-    for (let i = 6; i >= 0; i--) {
+    for (let i = daysRange - 1; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
       const dateStr = toPersianDate(d);
@@ -187,7 +188,20 @@ const Dashboard: React.FC<DashboardProps> = ({ accounts, sales, purchases }) => 
         </div>
 
         <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-200">
-          <h3 className="text-lg font-bold mb-6 text-slate-800 border-b border-slate-100 pb-2">روند ۷ روز گذشته</h3>
+          <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-2">
+            <h3 className="text-lg font-bold text-slate-800">روند {daysRange} روز گذشته</h3>
+            <select
+              value={daysRange}
+              onChange={(e) => setDaysRange(Number(e.target.value))}
+              className="bg-slate-50 border border-slate-200 text-slate-600 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-1.5 outline-none"
+            >
+              <option value={7}>۷ روز</option>
+              <option value={14}>۱۴ روز</option>
+              <option value={30}>۳۰ روز</option>
+              <option value={60}>۶۰ روز</option>
+              <option value={90}>۹۰ روز</option>
+            </select>
+          </div>
           <div className="h-60 md:h-72 ltr" dir="ltr">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={trendData}>
