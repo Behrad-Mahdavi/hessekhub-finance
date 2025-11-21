@@ -51,6 +51,8 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
     console.log('Total Customers:', customers.length);
     console.log('Total Subscriptions:', subscriptions.length);
     console.log('Active Subscriptions:', subscriptions.filter(s => s.status === 'ACTIVE').length);
+    console.log('All Subscriptions:', subscriptions.map(s => ({ id: s.id, status: s.status, customerId: s.customerId, planName: s.planName })));
+    console.log('All Customers:', customers.map(c => ({ id: c.id, name: c.name, activeSubId: c.activeSubscriptionId })));
 
     // Get unique customers with their ACTIVE subscription (not all subscriptions)
     const dailyDeliveries = customers
