@@ -36,7 +36,9 @@ import {
   addSupplier as firestoreAddSupplier,
   updateSupplier as firestoreUpdateSupplier,
   deleteSupplier as firestoreDeleteSupplier,
-  checkFirebaseConnection
+  checkFirebaseConnection,
+  addJournalEntry,
+  updateSupplier
 } from './services/firestore';
 
 type View = 'dashboard' | 'expenses' | 'sales' | 'ledger' | 'settings' | 'payroll' | 'subscriptions' | 'suppliers';
@@ -441,6 +443,53 @@ const App: React.FC = () => {
       // Local fallback (simplified)
       setPayrollPayments(prev => [payment, ...prev]);
       toast.success('پرداخت حقوق ثبت شد (محلی)');
+    }
+  };
+
+  const handleSupplierPayment = async (supplierId: string, amount: number, accountId: string, date: string, description: string) => {
+    try {
+      const supplier = suppliers.find(s => s.id === supplierId);
+      const assetAccount = accounts.find(a => a.id === accountId);
+
+      if (!supplier || !assetAccount) {
+        toast.error('تامین‌کننده یا حساب یافت نشد');
+        return;
+      }
+
+      // 1. Create Journal Entry
+      const journalEntry: JournalEntry = {
+        id: `JRN-${Math.floor(Math.random() * 100000)}`,
+        date: date,
+        description: description,
+        referenceId: supplierId,
+        lines: [
+          { accountId: supplierId, accountName: `حساب پرداختنی: ${supplier.name}`, debit: amount, credit: 0 }, // Decrease Liability (Debit)
+          { accountId: assetAccount.id, accountName: assetAccount.name, debit: 0, credit: amount }, // Decrease Asset (Credit)
+        ]
+      };
+
+      if (useFirebase) {
+        // Firebase Updates
+        // 1. Update Supplier Balance (Decrease Debt)
+        await updateSupplier(supplierId, { balance: supplier.balance - amount });
+
+        // 2. Update Asset Account Balance (Decrease Asset)
+        await firestoreUpdateAccount(assetAccount.id, { balance: assetAccount.balance - amount });
+
+        // 3. Add Journal Entry
+        await addJournalEntry(journalEntry);
+
+        toast.success('پرداخت با موفقیت ثبت شد');
+      } else {
+        // Local Fallback
+        setSuppliers(prev => prev.map(s => s.id === supplierId ? { ...s, balance: s.balance - amount } : s));
+        setAccounts(prev => prev.map(a => a.id === accountId ? { ...a, balance: a.balance - amount } : a));
+        setJournals(prev => [journalEntry, ...prev]);
+        toast.success('پرداخت ثبت شد (محلی)');
+      }
+    } catch (error) {
+      console.error('Error registering payment:', error);
+      toast.error('خطا در ثبت پرداخت');
     }
   };
 
@@ -1022,9 +1071,11 @@ const App: React.FC = () => {
           <SupplierManager
             suppliers={suppliers}
             purchases={purchases}
+            accounts={accounts}
             onAddSupplier={handleAddSupplier}
             onUpdateSupplier={handleUpdateSupplier}
             onDeleteSupplier={handleDeleteSupplier}
+            onPayment={handleSupplierPayment}
           />
         );
       default:

@@ -1,23 +1,47 @@
-import React from 'react';
-import { Supplier, PurchaseRequest, TransactionStatus } from '../types';
-import { formatPrice } from '../utils';
-import { X, Phone, MapPin, User, ShoppingBag, AlertTriangle, CheckCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { Supplier, PurchaseRequest, TransactionStatus, Account, AccountType } from '../types';
+import { formatPrice, toPersianDate } from '../utils';
+import { X, Phone, MapPin, User, ShoppingBag, AlertTriangle, CheckCircle, CreditCard, Calendar } from 'lucide-react';
 
 interface SupplierProfileModalProps {
     supplier: Supplier;
     purchases: PurchaseRequest[];
+    accounts: Account[];
     onClose: () => void;
+    onPayment: (supplierId: string, amount: number, accountId: string, date: string, description: string) => void;
 }
 
-const SupplierProfileModal: React.FC<SupplierProfileModalProps> = ({ supplier, purchases, onClose }) => {
+const SupplierProfileModal: React.FC<SupplierProfileModalProps> = ({ supplier, purchases, accounts, onClose, onPayment }) => {
+    const [showPaymentForm, setShowPaymentForm] = useState(false);
+    const [paymentData, setPaymentData] = useState({
+        amount: '',
+        accountId: '',
+        date: toPersianDate(new Date()),
+        description: ''
+    });
+
     // Filter purchases for this supplier
-    // We match by ID if available, or by name as fallback
     const supplierPurchases = purchases.filter(p =>
         p.supplierId === supplier.id || p.supplier === supplier.name
     ).sort((a, b) => b.date.localeCompare(a.date));
 
     const totalPurchases = supplierPurchases.length;
     const totalSpent = supplierPurchases.reduce((sum, p) => sum + p.amount, 0);
+
+    const handlePaymentSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!paymentData.amount || !paymentData.accountId) return;
+
+        onPayment(
+            supplier.id,
+            parseFloat(paymentData.amount),
+            paymentData.accountId,
+            paymentData.date,
+            paymentData.description || `پرداخت به ${supplier.name}`
+        );
+        setShowPaymentForm(false);
+        setPaymentData({ amount: '', accountId: '', date: toPersianDate(new Date()), description: '' });
+    };
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
@@ -64,11 +88,21 @@ const SupplierProfileModal: React.FC<SupplierProfileModalProps> = ({ supplier, p
                             <span className={`block text-xs font-bold uppercase mb-2 ${supplier.balance > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
                                 وضعیت حساب
                             </span>
-                            <div className={`text-2xl font-bold ${supplier.balance > 0 ? 'text-rose-700' : 'text-emerald-700'}`}>
-                                {formatPrice(Math.abs(supplier.balance))}
-                                <span className="text-sm font-normal mr-2 text-slate-500">
-                                    {supplier.balance > 0 ? 'بدهکاریم' : 'تسویه / بستانکار'}
-                                </span>
+                            <div className="flex justify-between items-end">
+                                <div className={`text-2xl font-bold ${supplier.balance > 0 ? 'text-rose-700' : 'text-emerald-700'}`}>
+                                    {formatPrice(Math.abs(supplier.balance))}
+                                    <span className="text-sm font-normal mr-2 text-slate-500">
+                                        {supplier.balance > 0 ? 'بدهکاریم' : 'تسویه / بستانکار'}
+                                    </span>
+                                </div>
+                                {supplier.balance > 0 && (
+                                    <button
+                                        onClick={() => setShowPaymentForm(!showPaymentForm)}
+                                        className="text-xs bg-rose-600 text-white px-3 py-1.5 rounded-lg hover:bg-rose-700 transition-colors shadow-sm"
+                                    >
+                                        ثبت پرداخت
+                                    </button>
+                                )}
                             </div>
                         </div>
 
@@ -82,6 +116,78 @@ const SupplierProfileModal: React.FC<SupplierProfileModalProps> = ({ supplier, p
                             <div className="text-2xl font-bold text-slate-700 dir-ltr">{formatPrice(totalSpent)}</div>
                         </div>
                     </div>
+
+                    {/* Payment Form */}
+                    {showPaymentForm && (
+                        <div className="bg-slate-50 p-5 rounded-xl border border-slate-200 animate-fade-in-down">
+                            <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2">
+                                <CreditCard className="w-5 h-5 text-indigo-600" />
+                                ثبت پرداخت به تامین‌کننده
+                            </h3>
+                            <form onSubmit={handlePaymentSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">مبلغ پرداختی (تومان)</label>
+                                    <input
+                                        required
+                                        type="number"
+                                        value={paymentData.amount}
+                                        onChange={(e) => setPaymentData({ ...paymentData, amount: e.target.value })}
+                                        className="w-full p-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none dir-ltr text-right"
+                                        placeholder="0"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">از حساب</label>
+                                    <select
+                                        required
+                                        value={paymentData.accountId}
+                                        onChange={(e) => setPaymentData({ ...paymentData, accountId: e.target.value })}
+                                        className="w-full p-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    >
+                                        <option value="">انتخاب کنید...</option>
+                                        {accounts.filter(a => a.type === AccountType.ASSET).map(acc => (
+                                            <option key={acc.id} value={acc.id}>{acc.name} ({formatPrice(acc.balance)})</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">تاریخ</label>
+                                    <input
+                                        type="text"
+                                        value={paymentData.date}
+                                        onChange={(e) => setPaymentData({ ...paymentData, date: e.target.value })}
+                                        className="w-full p-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none dir-ltr text-right"
+                                        placeholder="1403/01/01"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">توضیحات</label>
+                                    <input
+                                        type="text"
+                                        value={paymentData.description}
+                                        onChange={(e) => setPaymentData({ ...paymentData, description: e.target.value })}
+                                        className="w-full p-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                                        placeholder="بابت..."
+                                    />
+                                </div>
+                                <div className="md:col-span-2 flex justify-end gap-3 mt-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPaymentForm(false)}
+                                        className="px-4 py-2 text-slate-600 hover:bg-slate-200 rounded-xl font-medium"
+                                    >
+                                        انصراف
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="px-6 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 font-medium shadow-md"
+                                    >
+                                        ثبت پرداخت
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    )}
 
                     {/* Purchase History */}
                     <div>
@@ -130,8 +236,8 @@ const SupplierProfileModal: React.FC<SupplierProfileModalProps> = ({ supplier, p
                                                 </td>
                                                 <td className="p-3">
                                                     <span className={`text-xs font-bold px-2 py-1 rounded ${purchase.status === TransactionStatus.APPROVED ? 'bg-emerald-100 text-emerald-700' :
-                                                            purchase.status === TransactionStatus.REJECTED ? 'bg-rose-100 text-rose-700' :
-                                                                'bg-amber-100 text-amber-700'
+                                                        purchase.status === TransactionStatus.REJECTED ? 'bg-rose-100 text-rose-700' :
+                                                            'bg-amber-100 text-amber-700'
                                                         }`}>
                                                         {purchase.status === TransactionStatus.APPROVED ? 'تایید شده' :
                                                             purchase.status === TransactionStatus.REJECTED ? 'رد شده' : 'در انتظار'}

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Supplier, PurchaseRequest } from '../types';
+import { Supplier, PurchaseRequest, Account } from '../types';
 import { formatPrice } from '../utils';
 import { Plus, Search, Trash2, Edit2, Store, Phone, User } from 'lucide-react';
 import SupplierProfileModal from './SupplierProfileModal';
@@ -7,17 +7,21 @@ import SupplierProfileModal from './SupplierProfileModal';
 interface SupplierManagerProps {
     suppliers: Supplier[];
     purchases: PurchaseRequest[];
+    accounts: Account[]; // Added for payment selection
     onAddSupplier: (supplier: Supplier) => void;
     onUpdateSupplier: (id: string, data: Partial<Supplier>) => void;
     onDeleteSupplier: (id: string) => void;
+    onPayment: (supplierId: string, amount: number, accountId: string, date: string, description: string) => void;
 }
 
 const SupplierManager: React.FC<SupplierManagerProps> = ({
     suppliers,
     purchases,
+    accounts,
     onAddSupplier,
     onUpdateSupplier,
-    onDeleteSupplier
+    onDeleteSupplier,
+    onPayment
 }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [showForm, setShowForm] = useState(false);
@@ -222,6 +226,8 @@ const SupplierManager: React.FC<SupplierManagerProps> = ({
                 <SupplierProfileModal
                     supplier={selectedSupplier}
                     purchases={purchases}
+                    accounts={accounts}
+                    onPayment={onPayment}
                     onClose={() => setSelectedSupplier(null)}
                 />
             )}

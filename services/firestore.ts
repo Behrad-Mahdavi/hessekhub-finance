@@ -55,6 +55,11 @@ export const deleteSupplier = async (id: string) => {
     await deleteDoc(docRef);
 };
 
+export const addJournalEntry = async (journal: any) => {
+    const { id, ...data } = journal;
+    return await addDoc(journalsRef, cleanData(data));
+};
+
 // --- Seeding ---
 
 export const seedDatabase = async () => {
