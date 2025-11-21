@@ -61,6 +61,7 @@ export interface PurchaseRequest {
   amount: number;
   category: string;
   supplier: string;
+  supplierId?: string; // Link to Supplier
   description: string;
   status: TransactionStatus;
   date: string;
@@ -69,6 +70,15 @@ export interface PurchaseRequest {
   unit?: string;    // New: Unit name (e.g., Grams)
   paymentAccountId?: string; // New: ID of the asset account used for payment
   isCredit?: boolean; // New: If true, this is a credit purchase (Accounts Payable)
+}
+
+export interface Supplier {
+  id: string;
+  name: string;
+  contactPerson?: string;
+  phoneNumber?: string;
+  balance: number; // Positive = We owe them (Debt), Negative = They owe us (Credit/Advance)
+  address?: string;
 }
 
 export interface SaleRecord {

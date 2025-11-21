@@ -22,6 +22,7 @@ const purchasesRef = collection(db, 'purchases');
 const salesRef = collection(db, 'sales');
 const journalsRef = collection(db, 'journals');
 const employeesRef = collection(db, 'employees');
+const suppliersRef = collection(db, 'suppliers');
 
 // --- Generic Helpers ---
 
@@ -36,6 +37,22 @@ export const subscribeToCollection = <T>(collectionName: string, callback: (data
             console.error(`Error subscribing to ${collectionName}:`, error);
         }
     );
+};
+
+// --- Suppliers ---
+export const addSupplier = async (supplier: any) => {
+    const { id, ...data } = supplier;
+    return await addDoc(suppliersRef, cleanData(data));
+};
+
+export const updateSupplier = async (id: string, data: any) => {
+    const docRef = doc(db, 'suppliers', id);
+    await updateDoc(docRef, cleanData(data));
+};
+
+export const deleteSupplier = async (id: string) => {
+    const docRef = doc(db, 'suppliers', id);
+    await deleteDoc(docRef);
 };
 
 // --- Seeding ---

@@ -1,12 +1,13 @@
 import React, { useState, useMemo } from 'react';
-import { Account, AccountType, PurchaseRequest, TransactionStatus, UserRole } from '../types';
+import { Account, AccountType, PurchaseRequest, TransactionStatus, UserRole, Supplier } from '../types';
 import { toPersianDate, formatPrice } from '../utils';
 import { Plus, Check, X, FileText, Upload, Image as ImageIcon, Trash2, Search, Filter, BarChart3, Scale, CreditCard, AlertTriangle } from 'lucide-react';
 
 interface ExpensesProps {
   accounts: Account[];
   purchases: PurchaseRequest[];
-  onAddPurchase: (p: PurchaseRequest) => void;
+  suppliers: Supplier[];
+  onAddPurchase: (purchase: PurchaseRequest) => void;
   onApprovePurchase: (id: string) => void;
   onRejectPurchase: (id: string) => void;
   onDeletePurchase: (id: string) => void;
@@ -172,14 +173,33 @@ const Expenses: React.FC<ExpensesProps> = ({ accounts, purchases, onAddPurchase,
           <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">نام تامین‌کننده / فروشگاه</label>
-              <input
-                required
-                type="text"
-                value={formData.supplier}
-                onChange={(e) => setFormData({ ...formData, supplier: e.target.value })}
-                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
-                placeholder="مثلاً: فروشگاه قهوه تهران"
-              />
+              <div className="relative">
+                <select
+                  value={formData.supplierId}
+                  onChange={(e) => {
+                    const selectedSupplier = suppliers.find(s => s.id === e.target.value);
+                    setFormData({
+                      ...formData,
+                      supplierId: e.target.value,
+                      supplier: selectedSupplier ? selectedSupplier.name : e.target.value
+                    });
+                  }}
+                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none appearance-none"
+                >
+                  <option value="">انتخاب کنید...</option>
+                  {suppliers.map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                  <option value="NEW">+ ثبت تامین‌کننده جدید (در بخش تامین‌کنندگان)</option>
+                </select>
+                <div className="absolute left-3 top-3.5 pointer-events-none text-slate-400">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                </div>
+              </div>
+              {/* Fallback for manual entry if needed, or just guide them to use the manager */}
+              {formData.supplierId === 'NEW' && (
+                <p className="text-xs text-amber-600 mt-1">لطفاً ابتدا تامین‌کننده را در بخش "تامین‌کنندگان" ثبت کنید.</p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">مبلغ فاکتور (تومان)</label>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
-import { Account, PurchaseRequest, SaleRecord, JournalEntry, RevenueStream, TransactionStatus, UserRole, JournalLine, SubscriptionStatus, AccountType, Employee, Customer, Subscription, PayrollPayment } from './types';
+import { Account, PurchaseRequest, SaleRecord, JournalEntry, RevenueStream, TransactionStatus, UserRole, JournalLine, SubscriptionStatus, AccountType, Employee, Customer, Subscription, PayrollPayment, Supplier } from './types';
 import { toPersianDate } from './utils';
 import Dashboard from './components/Dashboard';
 import Expenses from './components/Expenses';
@@ -9,7 +9,8 @@ import Ledger from './components/Ledger';
 import Settings from './components/Settings';
 import Payroll from './components/Payroll';
 import SubscriptionManager from './components/SubscriptionManager';
-import { LayoutDashboard, ShoppingCart, PieChart, Book, Settings as SettingsIcon, Shield, Menu, X, Wallet, Users, Lock, LogIn } from 'lucide-react';
+import SupplierManager from './components/SupplierManager';
+import { LayoutDashboard, ShoppingCart, PieChart, Book, Settings as SettingsIcon, Shield, Menu, X, Wallet, Users, Lock, LogIn, Truck } from 'lucide-react';
 import {
   seedDatabase,
   subscribeToCollection,
@@ -32,10 +33,13 @@ import {
   addPayrollPayment as firestoreAddPayrollPayment,
   deleteCustomer as firestoreDeleteCustomer,
   deleteSubscription as firestoreDeleteSubscription,
+  addSupplier as firestoreAddSupplier,
+  updateSupplier as firestoreUpdateSupplier,
+  deleteSupplier as firestoreDeleteSupplier,
   checkFirebaseConnection
 } from './services/firestore';
 
-type View = 'dashboard' | 'expenses' | 'sales' | 'ledger' | 'settings' | 'payroll' | 'subscriptions';
+type View = 'dashboard' | 'expenses' | 'sales' | 'ledger' | 'settings' | 'payroll' | 'subscriptions' | 'suppliers';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('dashboard');
@@ -75,6 +79,7 @@ const App: React.FC = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [payrollPayments, setPayrollPayments] = useState<PayrollPayment[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [useFirebase, setUseFirebase] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState<'checking' | 'connected' | 'error'>('checking');
   const [connectionError, setConnectionError] = useState<string>('');
@@ -112,6 +117,7 @@ const App: React.FC = () => {
       subscribeToCollection<Customer>('customers', setCustomers);
       subscribeToCollection<Subscription>('subscriptions', setSubscriptions);
       subscribeToCollection<PayrollPayment>('payroll_payments', setPayrollPayments);
+      subscribeToCollection<Supplier>('suppliers', setSuppliers);
 
       console.log('Subscriptions established');
       setUseFirebase(true);
@@ -467,7 +473,52 @@ const App: React.FC = () => {
       }
     }
   };
+  const handleAddSupplier = async (supplier: Supplier) => {
+    if (useFirebase) {
+      try {
+        await firestoreAddSupplier(supplier);
+        toast.success('تامین‌کننده با موفقیت اضافه شد');
+      } catch (error) {
+        console.error("Error adding supplier:", error);
+        toast.error('خطا در افزودن تامین‌کننده');
+      }
+    } else {
+      setSuppliers(prev => [...prev, supplier]);
+      toast.success('تامین‌کننده اضافه شد (محلی)');
+    }
+  };
 
+  const handleUpdateSupplier = async (id: string, data: Partial<Supplier>) => {
+    if (useFirebase) {
+      try {
+        await firestoreUpdateSupplier(id, data);
+        toast.success('تامین‌کننده بروزرسانی شد');
+      } catch (error) {
+        console.error("Error updating supplier:", error);
+        toast.error('خطا در بروزرسانی تامین‌کننده');
+      }
+    } else {
+      setSuppliers(prev => prev.map(s => s.id === id ? { ...s, ...data } : s));
+      toast.success('تامین‌کننده بروزرسانی شد (محلی)');
+    }
+  };
+
+  const handleDeleteSupplier = async (id: string) => {
+    if (confirm('آیا از حذف این تامین‌کننده اطمینان دارید؟')) {
+      if (useFirebase) {
+        try {
+          await firestoreDeleteSupplier(id);
+          toast.success('تامین‌کننده حذف شد');
+        } catch (error) {
+          console.error("Error deleting supplier:", error);
+          toast.error('خطا در حذف تامین‌کننده');
+        }
+      } else {
+        setSuppliers(prev => prev.filter(s => s.id !== id));
+        toast.success('تامین‌کننده حذف شد (محلی)');
+      }
+    }
+  };
   // Accounting Engine Logic: Create Journal from Purchase Approval
   const handleApprovePurchase = async (id: string) => {
     const purchase = purchases.find(p => p.id === id);
@@ -504,47 +555,59 @@ const App: React.FC = () => {
         ]
       };
 
+      // 3. Update Supplier Balance if Credit Purchase
+      if (purchase.isCredit && purchase.supplierId) {
+        const supplier = suppliers.find(s => s.id === purchase.supplierId);
+        if (supplier) {
+          if (useFirebase) {
+            await firestoreUpdateSupplier(supplier.id, {
+              balance: supplier.balance + purchase.amount
+            });
+          } else {
+            setSuppliers(prev => prev.map(s => s.id === supplier.id ? { ...s, balance: s.balance + purchase.amount } : s));
+          }
+        }
+      }
+
       if (useFirebase) {
         try {
           // 1. Update Purchase Status
           await firestoreUpdatePurchase(id, { status: TransactionStatus.APPROVED });
+
+          // 2. Add Journal Entry
           await firestoreAddJournal(journalEntry);
 
           // 3. Update Account Balances
-          await firestoreUpdateAccount(expenseAccount.id, { balance: expenseAccount.balance + purchase.amount });
+          // Debit Expense
+          await firestoreUpdateAccount(expenseAccount.id, {
+            balance: expenseAccount.balance + purchase.amount
+          });
 
-          // For Credit Account:
-          // If Asset (Cash/Bank) -> Decrease Balance (Credit)
-          // If Liability (Accounts Payable) -> Increase Balance (Credit)
-          const newCreditBalance = creditAccount.type === AccountType.LIABILITY
-            ? creditAccount.balance + purchase.amount
-            : creditAccount.balance - purchase.amount;
+          // Credit Asset/Liability
+          await firestoreUpdateAccount(creditAccount.id, {
+            balance: creditAccount.type === AccountType.ASSET
+              ? creditAccount.balance - purchase.amount
+              : creditAccount.balance + purchase.amount
+          });
 
-          await firestoreUpdateAccount(creditAccount.id, { balance: newCreditBalance });
-          toast.success('خرید با موفقیت تایید شد');
+          toast.success('خرید تایید و سند حسابداری صادر شد');
         } catch (error) {
-          // Local Fallback
+          console.error('Firebase error, using local state:', error);
+          setUseFirebase(false); // Fallback to local state
+          // Local Fallback for purchase, journal, and accounts
           setPurchases(prev => prev.map(p => p.id === id ? { ...p, status: TransactionStatus.APPROVED } : p));
-          setJournals(prev => [...prev, journalEntry]);
-
-          setAccounts(prev => prev.map(acc => {
-            if (acc.id === expenseAccount.id) return { ...acc, balance: acc.balance + purchase.amount };
-            if (acc.id === creditAccount.id) {
-              return {
-                ...acc,
-                balance: acc.type === AccountType.LIABILITY
-                  ? acc.balance + purchase.amount
-                  : acc.balance - purchase.amount
-              };
-            }
-            return acc;
+          setJournals(prev => [journalEntry, ...prev]);
+          setAccounts(prev => prev.map(a => {
+            if (a.id === expenseAccount.id) return { ...a, balance: a.balance + purchase.amount };
+            if (a.id === creditAccount.id) return { ...a, balance: creditAccount.type === AccountType.ASSET ? a.balance - purchase.amount : a.balance + purchase.amount };
+            return a;
           }));
           toast.success('خرید تایید شد (ذخیره محلی)');
         }
       } else {
+        // Local Fallback
         setPurchases(prev => prev.map(p => p.id === id ? { ...p, status: TransactionStatus.APPROVED } : p));
-        setJournals(prev => [...prev, journalEntry]);
-
+        setJournals(prev => [journalEntry, ...prev]);
         setAccounts(prev => prev.map(acc => {
           if (acc.id === expenseAccount.id) return { ...acc, balance: acc.balance + purchase.amount };
           if (acc.id === creditAccount.id) {
@@ -878,6 +941,7 @@ const App: React.FC = () => {
     { id: 'expenses', label: 'خرید و هزینه', icon: ShoppingCart, view: 'expenses' },
     { id: 'sales', label: 'فروش و درآمد', icon: PieChart, view: 'sales' },
     { id: 'subscriptions', label: 'مدیریت اشتراک‌ها', icon: Users, view: 'subscriptions' },
+    { id: 'suppliers', label: 'تامین‌کنندگان', icon: Truck, view: 'suppliers' },
     { id: 'payroll', label: 'حقوق و دستمزد', icon: Wallet, view: 'payroll' },
     { id: 'ledger', label: 'دفتر کل', icon: Book, view: 'ledger' },
     { id: 'settings', label: 'تنظیمات', icon: SettingsIcon, view: 'settings' },
@@ -899,6 +963,7 @@ const App: React.FC = () => {
           <Expenses
             accounts={accounts}
             purchases={purchases}
+            suppliers={suppliers}
             onAddPurchase={handleAddPurchase}
             onApprovePurchase={handleApprovePurchase}
             onRejectPurchase={handleRejectPurchase}
@@ -950,6 +1015,16 @@ const App: React.FC = () => {
             onUpdateCustomer={handleUpdateCustomer}
             onDeleteCustomer={handleDeleteCustomer}
             onAddSubscription={handleAddSubscription}
+          />
+        );
+      case 'suppliers':
+        return (
+          <SupplierManager
+            suppliers={suppliers}
+            purchases={purchases}
+            onAddSupplier={handleAddSupplier}
+            onUpdateSupplier={handleUpdateSupplier}
+            onDeleteSupplier={handleDeleteSupplier}
           />
         );
       default:
