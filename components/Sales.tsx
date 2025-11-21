@@ -27,12 +27,6 @@ const Sales: React.FC<SalesProps> = ({ sales, accounts, onAddSale, onCancelSubsc
     const [discount, setDiscount] = useState('');
     const [refund, setRefund] = useState('');
 
-    // Subscriptions
-    const [duration, setDuration] = useState('1 ماهه');
-    const [customerName, setCustomerName] = useState(''); // New Field
-    const [showCancelModal, setShowCancelModal] = useState<string | null>(null); // ID of subscription to cancel
-    const [refundAmount, setRefundAmount] = useState('0');
-
     // Payment Details State
     const [paymentAccountId, setPaymentAccountId] = useState('');
     const [showPaymentDetails, setShowPaymentDetails] = useState(false);
@@ -49,8 +43,6 @@ const Sales: React.FC<SalesProps> = ({ sales, accounts, onAddSale, onCancelSubsc
         setDiscount('');
         setRefund('');
         setDetails('');
-        setCustomerName('');
-        setShowCancelModal(null);
         setPaymentAccountId('');
         setShowPaymentDetails(false);
         setCashAmount('');
@@ -123,14 +115,9 @@ const Sales: React.FC<SalesProps> = ({ sales, accounts, onAddSale, onCancelSubsc
             saleRecord.refund = r;
             saleRecord.cardToCardTransactions = c2cTransactions;
         } else {
+            // ASSESSMENT - Simple amount
             finalAmount = parseFloat(simpleAmount) || 0;
             saleRecord.amount = finalAmount;
-            if (activeTab === RevenueStream.SUBSCRIPTION) {
-                saleRecord.duration = duration;
-                saleRecord.subscriptionStatus = SubscriptionStatus.ACTIVE;
-                saleRecord.customerName = customerName;
-                saleRecord.details = `${saleRecord.details} - ${customerName}`; // Append name to details for Ledger visibility
-            }
         }
 
         onAddSale(saleRecord);
@@ -141,7 +128,6 @@ const Sales: React.FC<SalesProps> = ({ sales, accounts, onAddSale, onCancelSubsc
         setDiscount('');
         setRefund('');
         setDetails('');
-        setCustomerName('');
         setPaymentAccountId('');
         setCashAmount('');
         setCashAmount('');
@@ -151,27 +137,9 @@ const Sales: React.FC<SalesProps> = ({ sales, accounts, onAddSale, onCancelSubsc
         setShowPaymentDetails(false);
     };
 
-    const handleRenewClick = (sub: SaleRecord) => {
-        setActiveTab(RevenueStream.SUBSCRIPTION);
-        setDetails(`${sub.details.split(' - ')[0]} (تمدید)`);
-        setSimpleAmount(sub.amount.toString());
-        setDuration(sub.duration || '1 ماهه');
-        setCustomerName(sub.customerName || '');
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    };
-
-    const handleConfirmCancel = () => {
-        if (showCancelModal && onCancelSubscription) {
-            onCancelSubscription(showCancelModal, parseFloat(refundAmount) || 0);
-            setShowCancelModal(null);
-            setRefundAmount('0');
-        }
-    };
-
     const getDefaultDetails = (stream: RevenueStream) => {
         switch (stream) {
             case RevenueStream.CAFE: return 'فروش روزانه کافه';
-            case RevenueStream.SUBSCRIPTION: return 'پکیج سلامتی طلایی';
             case RevenueStream.ASSESSMENT: return 'ویزیت و آنالیز بدن';
         }
     };
@@ -179,13 +147,11 @@ const Sales: React.FC<SalesProps> = ({ sales, accounts, onAddSale, onCancelSubsc
     const getTabLabel = (stream: RevenueStream) => {
         switch (stream) {
             case RevenueStream.CAFE: return 'کافه';
-            case RevenueStream.SUBSCRIPTION: return 'اشتراک‌ها';
             case RevenueStream.ASSESSMENT: return 'مشاوره تغذیه';
         }
     }
 
     const filteredSales = sales.filter(s => s.stream === activeTab);
-    const activeSubscriptions = sales.filter(s => s.stream === RevenueStream.SUBSCRIPTION && s.subscriptionStatus === SubscriptionStatus.ACTIVE);
 
     return (
         <div className="p-4 md:p-8 h-full flex flex-col overflow-y-auto">
@@ -202,13 +168,6 @@ const Sales: React.FC<SalesProps> = ({ sales, accounts, onAddSale, onCancelSubsc
                         }`}
                 >
                     <Coffee className="w-4 h-4" /> <span className="hidden md:inline">کافه</span>
-                </button>
-                <button
-                    onClick={() => setActiveTab(RevenueStream.SUBSCRIPTION)}
-                    className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-4 md:px-6 py-3 rounded-lg font-bold text-xs md:text-sm transition-all ${activeTab === RevenueStream.SUBSCRIPTION ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
-                        }`}
-                >
-                    <Users className="w-4 h-4" /> <span className="hidden md:inline">پکیج‌های اشتراکی</span><span className="md:hidden">اشتراک</span>
                 </button>
                 <button
                     onClick={() => setActiveTab(RevenueStream.ASSESSMENT)}
@@ -381,40 +340,7 @@ const Sales: React.FC<SalesProps> = ({ sales, accounts, onAddSale, onCancelSubsc
                             </div>
                         )}
 
-                        {activeTab === RevenueStream.SUBSCRIPTION && (
-                            <>
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">نام مشتری</label>
-                                    <div className="relative">
-                                        <input
-                                            required
-                                            type="text"
-                                            value={customerName}
-                                            onChange={(e) => setCustomerName(e.target.value)}
-                                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
-                                            placeholder="مثلاً: علی رضایی"
-                                        />
-                                        <User className="absolute left-3 top-3.5 w-4 h-4 text-slate-400 pointer-events-none" />
-                                    </div>
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">مدت اشتراک</label>
-                                    <div className="relative">
-                                        <select
-                                            value={duration}
-                                            onChange={(e) => setDuration(e.target.value)}
-                                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none appearance-none"
-                                        >
-                                            <option>1 هفته</option>
-                                            <option>1 ماهه</option>
-                                            <option>3 ماهه (با تخفیف)</option>
-                                            <option>6 ماهه</option>
-                                        </select>
-                                        <Clock className="absolute left-3 top-3.5 w-4 h-4 text-slate-400 pointer-events-none" />
-                                    </div>
-                                </div>
-                            </>
-                        )}
+
 
                         <div>
                             <label className="block text-xs font-bold text-slate-500 uppercase mb-2">جزئیات / توضیحات</label>
@@ -453,58 +379,6 @@ const Sales: React.FC<SalesProps> = ({ sales, accounts, onAddSale, onCancelSubsc
                 {/* Lists */}
                 <div className="lg:col-span-2 flex flex-col gap-6 md:gap-8">
 
-                    {/* Active Subscriptions Management */}
-                    {activeTab === RevenueStream.SUBSCRIPTION && activeSubscriptions.length > 0 && (
-                        <div className="bg-emerald-50 rounded-2xl shadow-sm border border-emerald-100 overflow-hidden">
-                            <div className="p-4 md:p-5 border-b border-emerald-100 bg-emerald-100/50 flex justify-between items-center">
-                                <h3 className="font-bold text-emerald-800 flex items-center gap-2 text-sm md:text-base">
-                                    <Users className="w-5 h-5" /> اشتراک‌های فعال جاری
-                                </h3>
-                            </div>
-                            <div className="p-0 overflow-x-auto">
-                                <table className="w-full text-right min-w-[600px]">
-                                    <thead className="bg-emerald-50/50 text-xs text-emerald-600 uppercase border-b border-emerald-100">
-                                        <tr>
-                                            <th className="p-4">شناسه</th>
-                                            <th className="p-4">نام مشتری</th>
-                                            <th className="p-4">توضیحات</th>
-                                            <th className="p-4">تاریخ شروع</th>
-                                            <th className="p-4">مدت</th>
-                                            <th className="p-4 text-left">عملیات</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-emerald-100">
-                                        {activeSubscriptions.map(sub => (
-                                            <tr key={sub.id} className="hover:bg-emerald-100/30 transition-colors">
-                                                <td className="p-4 font-mono text-xs">{sub.id}</td>
-                                                <td className="p-4 font-bold text-sm text-emerald-800">{sub.customerName || 'ناشناس'}</td>
-                                                <td className="p-4 text-sm text-slate-700 truncate max-w-[150px]">{sub.details}</td>
-                                                <td className="p-4 text-sm">{sub.date}</td>
-                                                <td className="p-4 text-sm"><span className="bg-white px-2 py-1 rounded text-emerald-700 border border-emerald-200 whitespace-nowrap">{sub.duration}</span></td>
-                                                <td className="p-4">
-                                                    <div className="flex gap-2 justify-end">
-                                                        <button
-                                                            onClick={() => handleRenewClick(sub)}
-                                                            className="flex items-center gap-1 px-3 py-1.5 bg-white border border-emerald-200 text-emerald-700 rounded-lg text-xs font-bold hover:bg-emerald-50 transition-colors"
-                                                        >
-                                                            <RefreshCw className="w-3 h-3" /> <span className="hidden lg:inline">تمدید</span>
-                                                        </button>
-                                                        <button
-                                                            onClick={() => setShowCancelModal(sub.id)}
-                                                            className="flex items-center gap-1 px-3 py-1.5 bg-white border border-rose-200 text-rose-600 rounded-lg text-xs font-bold hover:bg-rose-50 transition-colors"
-                                                        >
-                                                            <Ban className="w-3 h-3" /> <span className="hidden lg:inline">لغو</span>
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    )}
-
                     {/* Recent Transactions List */}
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col overflow-hidden h-[400px]">
                         <div className="p-4 md:p-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
@@ -518,8 +392,6 @@ const Sales: React.FC<SalesProps> = ({ sales, accounts, onAddSale, onCancelSubsc
                                         <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">شناسه</th>
                                         <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">تاریخ</th>
                                         <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">شرح</th>
-                                        {activeTab === RevenueStream.SUBSCRIPTION && <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">مشتری</th>}
-                                        {activeTab === RevenueStream.SUBSCRIPTION && <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">وضعیت</th>}
                                         {activeTab === RevenueStream.CAFE && <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">ناخالص</th>}
                                         <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-left">دریافتی نقد</th>
                                         <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-left">عملیات</th>
@@ -534,16 +406,6 @@ const Sales: React.FC<SalesProps> = ({ sales, accounts, onAddSale, onCancelSubsc
                                                 {s.details}
                                                 {s.discount && s.discount > 0 ? <span className="block text-xs text-rose-500 mt-0.5">تخفیف: {s.discount.toLocaleString()}</span> : null}
                                             </td>
-                                            {activeTab === RevenueStream.SUBSCRIPTION && (
-                                                <td className="p-4 text-sm text-slate-600">{s.customerName || '-'}</td>
-                                            )}
-                                            {activeTab === RevenueStream.SUBSCRIPTION && (
-                                                <td className="p-4">
-                                                    {s.subscriptionStatus === SubscriptionStatus.ACTIVE && <span className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded text-xs">فعال</span>}
-                                                    {s.subscriptionStatus === SubscriptionStatus.CANCELLED && <span className="bg-rose-100 text-rose-700 px-2 py-1 rounded text-xs">لغو شده</span>}
-                                                    {!s.subscriptionStatus && <span className="text-slate-400 text-xs">-</span>}
-                                                </td>
-                                            )}
                                             {activeTab === RevenueStream.CAFE && (
                                                 <td className="p-4 text-xs text-slate-500 font-mono">{s.grossAmount?.toLocaleString() || '-'}</td>
                                             )}
@@ -573,51 +435,7 @@ const Sales: React.FC<SalesProps> = ({ sales, accounts, onAddSale, onCancelSubsc
                 </div>
             </div >
 
-            {/* Cancel Modal */}
-            {
-                showCancelModal && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-                        <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-fade-in-up">
-                            <div className="p-6 text-center">
-                                <div className="w-16 h-16 bg-rose-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                    <AlertTriangle className="w-8 h-8 text-rose-600" />
-                                </div>
-                                <h3 className="text-xl font-bold text-slate-800 mb-2">لغو اشتراک</h3>
-                                <p className="text-slate-500 text-sm mb-6">
-                                    آیا از لغو این اشتراک اطمینان دارید؟<br />
-                                    در صورت نیاز به بازگشت وجه، مبلغ را وارد کنید.
-                                </p>
 
-                                <div className="bg-slate-50 p-4 rounded-xl text-right mb-6 border border-slate-200">
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">مبلغ عودت وجه (تومان)</label>
-                                    <input
-                                        type="number"
-                                        value={refundAmount}
-                                        onChange={(e) => setRefundAmount(e.target.value)}
-                                        className="w-full p-3 bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-rose-500 dir-ltr text-left font-bold"
-                                    />
-                                    <p className="text-xs text-slate-400 mt-2">* این مبلغ از "پیش‌دریافت‌ها" کسر و از "صندوق" پرداخت می‌شود.</p>
-                                </div>
-
-                                <div className="flex gap-3">
-                                    <button
-                                        onClick={() => setShowCancelModal(null)}
-                                        className="flex-1 py-3 text-slate-600 hover:bg-slate-100 rounded-xl font-bold transition-colors"
-                                    >
-                                        انصراف
-                                    </button>
-                                    <button
-                                        onClick={handleConfirmCancel}
-                                        className="flex-1 py-3 bg-rose-600 text-white hover:bg-rose-700 rounded-xl font-bold shadow-lg shadow-rose-200 transition-colors"
-                                    >
-                                        تایید لغو اشتراک
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )
-            }
 
         </div >
     );

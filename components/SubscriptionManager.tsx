@@ -114,11 +114,13 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
 
         onAddSubscription(newSub, newSale);
 
-        // Update Customer Balance if Credit
-        if (renewIsCredit) {
-            const updatedCustomer = { ...selectedCustomer, balance: selectedCustomer.balance - parseFloat(renewPrice) };
-            onUpdateCustomer(updatedCustomer);
-        }
+        // Update Customer (balance if credit, and always set activeSubscriptionId)
+        const updatedCustomer = {
+            ...selectedCustomer,
+            balance: renewIsCredit ? selectedCustomer.balance - parseFloat(renewPrice) : selectedCustomer.balance,
+            activeSubscriptionId: newSub.id
+        };
+        onUpdateCustomer(updatedCustomer);
 
         setShowRenewModal(false);
         setRenewPrice('');
@@ -155,7 +157,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
                     {!isTodayDelivery && (
                         <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-xl flex items-center gap-2">
                             <AlertTriangle className="w-5 h-5" />
-                            <span className="font-bold">امروز جمعه است و ارسال نداریم.</span>
+                            <span className="font-bold">امروز جمعه است - ارسال‌های شنبه:</span>
                         </div>
                     )}
 
