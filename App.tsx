@@ -299,6 +299,55 @@ const App: React.FC = () => {
           await firestoreUpdateCustomer(customer.id, { activeSubscriptionId: subscription.id });
         }
 
+        // Accounting Logic (similar to handleAddSale)
+        if (subscription.paymentStatus === 'PAID' && sale.paymentAccountId) {
+          // Update Account Balance (Debit Asset Account)
+          const paymentAccount = accounts.find(a => a.id === sale.paymentAccountId);
+          if (paymentAccount) {
+            await firestoreUpdateAccount(sale.paymentAccountId, {
+              balance: paymentAccount.balance + sale.amount
+            });
+            setAccounts(prev => prev.map(a =>
+              a.id === sale.paymentAccountId ? { ...a, balance: a.balance + sale.amount } : a
+            ));
+          }
+
+          // Credit Revenue (find or use subscription revenue account)
+          const subscriptionRevenueAccount = accounts.find(a => a.code === '4020'); // Subscription Revenue
+          if (subscriptionRevenueAccount) {
+            await firestoreUpdateAccount(subscriptionRevenueAccount.id, {
+              balance: subscriptionRevenueAccount.balance + sale.amount
+            });
+            setAccounts(prev => prev.map(a =>
+              a.id === subscriptionRevenueAccount.id ? { ...a, balance: a.balance + sale.amount } : a
+            ));
+          }
+
+          // Create Journal Entry
+          const journal: JournalEntry = {
+            id: `JRN-${Math.floor(Math.random() * 100000)}`,
+            date: sale.date,
+            description: `دریافت اشتراک از ${customer?.name || 'مشتری'} - ${subscription.planName}`,
+            lines: [
+              {
+                accountId: sale.paymentAccountId,
+                accountName: paymentAccount?.name || 'حساب پرداخت',
+                debit: sale.amount,
+                credit: 0,
+              },
+              {
+                accountId: subscriptionRevenueAccount?.id || '',
+                accountName: subscriptionRevenueAccount?.name || 'درآمد اشتراک',
+                debit: 0,
+                credit: sale.amount,
+              },
+            ],
+          };
+
+          await firestoreAddJournal(journal);
+          setJournals(prev => [journal, ...prev]);
+        }
+
         toast.success('اشتراک با موفقیت ثبت شد');
       } catch (error) {
         console.error('Firebase error, using local state:', error);

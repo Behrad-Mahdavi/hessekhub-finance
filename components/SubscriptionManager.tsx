@@ -43,26 +43,24 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
     const today = new Date();
     const isTodayDelivery = isDeliveryDay(today);
 
-    const dailyDeliveries = subscriptions.filter(sub => {
-        if (sub.status !== 'ACTIVE') return false;
-        // Simple date range check (In a real app, compare timestamps or normalized dates)
-        // For now, assuming dates are stored as YYYY/MM/DD strings is tricky for range.
-        // Let's assume we parse them or they are comparable.
-        // Better: Store dates as ISO strings or timestamps in types, but current app uses Persian strings?
-        // Wait, types says `date: string`. App uses `toPersianDate`.
-        // Comparing Persian strings works for range if format is YYYY/MM/DD.
-        // But `calculateSubscriptionEndDate` returns a Date object.
-        // We need to store standard dates for logic, or convert.
-        // Let's assume for this feature we might need to store ISO dates in Subscription?
-        // Or just convert current Persian date to string and compare?
-        // "1403/08/01" <= "1403/08/05" works.
+    // Get unique customers with their ACTIVE subscription (not all subscriptions)
+    const dailyDeliveries = customers
+        .map(customer => {
+            // Find customer's active subscription
+            const activeSub = customer.activeSubscriptionId
+                ? subscriptions.find(s => s.id === customer.activeSubscriptionId && s.status === 'ACTIVE')
+                : subscriptions.find(s => s.customerId === customer.id && s.status === 'ACTIVE');
 
-        const todayPersian = toPersianDate(today);
-        return sub.startDate <= todayPersian && sub.endDate >= todayPersian;
-    }).map(sub => {
-        const customer = customers.find(c => c.id === sub.customerId);
-        return { sub, customer };
-    }).filter(item => item.customer); // Ensure customer exists
+            if (!activeSub) return null;
+
+            // Check if today is within subscription range
+            const todayPersian = toPersianDate(today);
+            if (activeSub.startDate <= todayPersian && activeSub.endDate >= todayPersian) {
+                return { sub: activeSub, customer };
+            }
+            return null;
+        })
+        .filter(item => item !== null) as { sub: Subscription; customer: Customer }[];
 
     const handleCreateCustomer = (e: React.FormEvent) => {
         e.preventDefault();
