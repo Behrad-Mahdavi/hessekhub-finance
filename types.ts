@@ -84,9 +84,9 @@ export interface SaleRecord {
   subscriptionStatus?: SubscriptionStatus; // Only for SUBSCRIPTION stream
   customerName?: string; // New field for Subscription customer name
   paymentAccountId?: string; // New: ID of the bank account receiving POS/C2C payments
+  posAmount?: number; // New: Amount received via POS
   cashAmount?: number; // New: Amount received in cash
-  cardToCardAmount?: number; // New: Amount received via Card-to-Card
-  cardToCardSender?: string; // New: Sender details for C2C
+  cardToCardTransactions?: { amount: number; sender: string }[]; // New: List of C2C transactions
 }
 
 export interface Employee {

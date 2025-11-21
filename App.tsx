@@ -460,8 +460,9 @@ const App: React.FC = () => {
 
         // Calculate Split Amounts
         const cashReceived = sale.cashAmount || 0;
-        const c2cReceived = sale.cardToCardAmount || 0;
-        const posReceived = sale.amount - cashReceived - c2cReceived; // Remaining is POS
+        const c2cTransactions = sale.cardToCardTransactions || [];
+        const c2cTotal = c2cTransactions.reduce((sum, t) => sum + t.amount, 0);
+        const posReceived = sale.posAmount || 0;
 
         // 1. Debit Cash on Hand
         if (cashReceived > 0) {
@@ -469,7 +470,7 @@ const App: React.FC = () => {
         }
 
         // 2. Debit Bank Account (POS + C2C)
-        const totalBankDeposit = posReceived + c2cReceived;
+        const totalBankDeposit = posReceived + c2cTotal;
         if (totalBankDeposit > 0) {
           newLines.push({ accountId: bankAccount.id, accountName: bankAccount.name, debit: totalBankDeposit, credit: 0 });
         }
@@ -487,10 +488,14 @@ const App: React.FC = () => {
         // Credit Gross Revenue
         newLines.push({ accountId: revenueAccount.id, accountName: revenueAccount.name, debit: 0, credit: sale.grossAmount });
 
+        const c2cDetails = c2cTransactions.length > 0
+          ? ` (واریزها: ${c2cTransactions.map(t => `${t.sender} ${t.amount.toLocaleString()}`).join('، ')})`
+          : '';
+
         const journalEntry: JournalEntry = {
           id: `JRN-${Math.floor(Math.random() * 100000)}`,
           date: sale.date,
-          description: `فروش: ${sale.details} ${sale.cardToCardSender ? `(واریز: ${sale.cardToCardSender})` : ''}`,
+          description: `فروش: ${sale.details}${c2cDetails}`,
           referenceId: sale.id,
           lines: newLines
         };

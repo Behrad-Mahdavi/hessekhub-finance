@@ -37,8 +37,10 @@ const Sales: React.FC<SalesProps> = ({ sales, accounts, onAddSale, onCancelSubsc
     const [paymentAccountId, setPaymentAccountId] = useState('');
     const [showPaymentDetails, setShowPaymentDetails] = useState(false);
     const [cashAmount, setCashAmount] = useState('');
-    const [cardToCardAmount, setCardToCardAmount] = useState('');
-    const [cardToCardSender, setCardToCardSender] = useState('');
+
+    const [c2cTransactions, setC2cTransactions] = useState<{ amount: number; sender: string }[]>([]);
+    const [tempC2cAmount, setTempC2cAmount] = useState('');
+    const [tempC2cSender, setTempC2cSender] = useState('');
 
     // Reset form when tab changes
     useEffect(() => {
@@ -52,15 +54,37 @@ const Sales: React.FC<SalesProps> = ({ sales, accounts, onAddSale, onCancelSubsc
         setPaymentAccountId('');
         setShowPaymentDetails(false);
         setCashAmount('');
-        setCardToCardAmount('');
-        setCardToCardSender('');
+
+        setC2cTransactions([]);
+        setTempC2cAmount('');
+        setTempC2cSender('');
     }, [activeTab]);
 
     const calculateNet = () => {
-        const g = parseFloat(grossAmount) || 0;
+        const pos = parseFloat(grossAmount) || 0;
+        const cash = parseFloat(cashAmount) || 0;
+        const c2cTotal = c2cTransactions.reduce((sum, t) => sum + t.amount, 0);
+        const totalGross = pos + cash + c2cTotal;
+
         const d = parseFloat(discount) || 0;
         const r = parseFloat(refund) || 0;
-        return Math.max(0, g - d - r);
+        return Math.max(0, totalGross - d - r);
+    };
+
+    const handleAddC2cTransaction = () => {
+        if (!tempC2cAmount || !tempC2cSender) {
+            toast.error('لطفاً مبلغ و نام واریز کننده را وارد کنید');
+            return;
+        }
+        setC2cTransactions([...c2cTransactions, { amount: parseFloat(tempC2cAmount), sender: tempC2cSender }]);
+        setTempC2cAmount('');
+        setTempC2cSender('');
+    };
+
+    const handleRemoveC2cTransaction = (index: number) => {
+        const newTransactions = [...c2cTransactions];
+        newTransactions.splice(index, 1);
+        setC2cTransactions(newTransactions);
     };
 
     const handleAddSale = (e: React.FormEvent) => {
@@ -75,35 +99,29 @@ const Sales: React.FC<SalesProps> = ({ sales, accounts, onAddSale, onCancelSubsc
             amount: 0,
             paymentAccountId: paymentAccountId || undefined,
             cashAmount: cashAmount ? parseFloat(cashAmount) : undefined,
-            cardToCardAmount: cardToCardAmount ? parseFloat(cardToCardAmount) : undefined,
-            cardToCardSender: cardToCardSender || undefined,
         };
 
         if (activeTab === RevenueStream.CAFE) {
-            const g = parseFloat(grossAmount) || 0;
+            const pos = parseFloat(grossAmount) || 0;
+            const cash = parseFloat(cashAmount) || 0;
+            const c2cTotal = c2cTransactions.reduce((sum, t) => sum + t.amount, 0);
+
+            const totalGross = pos + cash + c2cTotal;
             const d = parseFloat(discount) || 0;
             const r = parseFloat(refund) || 0;
-            finalAmount = g - d - r;
+            finalAmount = totalGross - d - r;
 
-            // Validation for Split Payment
-            const cash = parseFloat(cashAmount) || 0;
-            const c2c = parseFloat(cardToCardAmount) || 0;
-
-            if (cash + c2c > finalAmount) {
-                toast.error('مجموع مبالغ نقد و کارت به کارت نمی‌تواند بیشتر از مبلغ خالص باشد');
-                return;
-            }
-
-            const posAmount = finalAmount - cash - c2c;
-            if (posAmount > 0 && !paymentAccountId) {
+            if (pos > 0 && !paymentAccountId) {
                 toast.error('لطفاً حساب دریافت کننده (کارتخوان) را انتخاب کنید');
                 return;
             }
 
             saleRecord.amount = finalAmount;
-            saleRecord.grossAmount = g;
+            saleRecord.grossAmount = totalGross;
+            saleRecord.posAmount = pos;
             saleRecord.discount = d;
             saleRecord.refund = r;
+            saleRecord.cardToCardTransactions = c2cTransactions;
         } else {
             finalAmount = parseFloat(simpleAmount) || 0;
             saleRecord.amount = finalAmount;
@@ -126,8 +144,10 @@ const Sales: React.FC<SalesProps> = ({ sales, accounts, onAddSale, onCancelSubsc
         setCustomerName('');
         setPaymentAccountId('');
         setCashAmount('');
-        setCardToCardAmount('');
-        setCardToCardSender('');
+        setCashAmount('');
+        setC2cTransactions([]);
+        setTempC2cAmount('');
+        setTempC2cSender('');
         setShowPaymentDetails(false);
     };
 
@@ -211,8 +231,9 @@ const Sales: React.FC<SalesProps> = ({ sales, accounts, onAddSale, onCancelSubsc
                         {activeTab === RevenueStream.CAFE ? (
                             // Cafe Split Form
                             <div className="space-y-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">فروش ناخالص</label>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">دریافتی کارتخوان (POS)</label>
                                     <input
                                         required
                                         type="number"
@@ -287,27 +308,54 @@ const Sales: React.FC<SalesProps> = ({ sales, accounts, onAddSale, onCancelSubsc
                                                     placeholder="0"
                                                 />
                                             </div>
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <div>
-                                                    <label className="block text-xs font-bold text-indigo-700 mb-1">مبلغ کارت به کارت</label>
-                                                    <input
-                                                        type="number"
-                                                        value={cardToCardAmount}
-                                                        onChange={(e) => setCardToCardAmount(e.target.value)}
-                                                        className="w-full p-2 border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none dir-ltr text-left"
-                                                        placeholder="0"
-                                                    />
+                                            <div className="space-y-3">
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <div>
+                                                        <label className="block text-xs font-bold text-indigo-700 mb-1">مبلغ کارت به کارت</label>
+                                                        <input
+                                                            type="number"
+                                                            value={tempC2cAmount}
+                                                            onChange={(e) => setTempC2cAmount(e.target.value)}
+                                                            className="w-full p-2 border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none dir-ltr text-left"
+                                                            placeholder="0"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs font-bold text-indigo-700 mb-1">نام واریز کننده</label>
+                                                        <input
+                                                            type="text"
+                                                            value={tempC2cSender}
+                                                            onChange={(e) => setTempC2cSender(e.target.value)}
+                                                            className="w-full p-2 border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                            placeholder="مثلاً: علی محمدی"
+                                                        />
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <label className="block text-xs font-bold text-indigo-700 mb-1">نام واریز کننده</label>
-                                                    <input
-                                                        type="text"
-                                                        value={cardToCardSender}
-                                                        onChange={(e) => setCardToCardSender(e.target.value)}
-                                                        className="w-full p-2 border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                                                        placeholder="مثلاً: علی محمدی"
-                                                    />
-                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleAddC2cTransaction}
+                                                    className="w-full py-2 bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold hover:bg-indigo-200 transition-colors"
+                                                >
+                                                    افزودن تراکنش
+                                                </button>
+
+                                                {/* List of C2C Transactions */}
+                                                {c2cTransactions.length > 0 && (
+                                                    <div className="space-y-2 mt-2">
+                                                        {c2cTransactions.map((t, idx) => (
+                                                            <div key={idx} className="flex justify-between items-center bg-white p-2 rounded border border-indigo-100 text-xs">
+                                                                <span className="text-slate-600">{t.sender}: {formatPrice(t.amount)}</span>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleRemoveC2cTransaction(idx)}
+                                                                    className="text-rose-500 hover:text-rose-700"
+                                                                >
+                                                                    <Trash2 className="w-3 h-3" />
+                                                                </button>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     )}
