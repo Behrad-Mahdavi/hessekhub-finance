@@ -190,17 +190,17 @@ const Dashboard: React.FC<DashboardProps> = ({ accounts, sales, purchases }) => 
         <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-200">
           <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-2">
             <h3 className="text-lg font-bold text-slate-800">روند {daysRange} روز گذشته</h3>
-            <select
-              value={daysRange}
-              onChange={(e) => setDaysRange(Number(e.target.value))}
-              className="bg-slate-50 border border-slate-200 text-slate-600 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-1.5 outline-none"
-            >
-              <option value={7}>۷ روز</option>
-              <option value={14}>۱۴ روز</option>
-              <option value={30}>۳۰ روز</option>
-              <option value={60}>۶۰ روز</option>
-              <option value={90}>۹۰ روز</option>
-            </select>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-slate-500">تعداد روز:</span>
+              <input
+                type="number"
+                min="1"
+                max="365"
+                value={daysRange}
+                onChange={(e) => setDaysRange(Math.max(1, Number(e.target.value)))}
+                className="w-20 bg-slate-50 border border-slate-200 text-slate-600 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-1.5 outline-none text-center dir-ltr"
+              />
+            </div>
           </div>
           <div className="h-60 md:h-72 ltr" dir="ltr">
             <ResponsiveContainer width="100%" height="100%">
