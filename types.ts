@@ -87,6 +87,30 @@ export interface SaleRecord {
   posAmount?: number; // New: Amount received via POS
   cashAmount?: number; // New: Amount received in cash
   cardToCardTransactions?: { amount: number; sender: string }[]; // New: List of C2C transactions
+  customerId?: string; // New: Link to Customer
+  subscriptionId?: string; // New: Link to Subscription
+}
+
+export interface Customer {
+  id: string;
+  name: string;
+  phoneNumber: string;
+  balance: number; // Positive = Credit (Good), Negative = Debt (Bad)
+  joinDate: string;
+  activeSubscriptionId?: string;
+}
+
+export interface Subscription {
+  id: string;
+  customerId: string;
+  planName: string; // e.g., "2 Weeks", "1 Month"
+  startDate: string;
+  endDate: string;
+  totalDeliveryDays: number;
+  remainingDays: number;
+  status: 'ACTIVE' | 'EXPIRED' | 'CANCELED';
+  price: number;
+  paymentStatus: 'PAID' | 'CREDIT'; // Credit means unpaid/debt
 }
 
 export interface Employee {

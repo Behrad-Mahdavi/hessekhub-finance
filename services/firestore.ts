@@ -9,10 +9,11 @@ import {
     orderBy,
     onSnapshot,
     writeBatch,
-    setDoc
+    setDoc,
+    limit
 } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Account, PurchaseRequest, SaleRecord, JournalEntry, Employee } from '../types';
+import { Account, PurchaseRequest, SaleRecord, JournalEntry, Employee, Customer, Subscription } from '../types';
 import { INITIAL_ACCOUNTS, MOCK_PURCHASES, MOCK_SALES, INITIAL_JOURNALS, INITIAL_EMPLOYEES } from '../constants';
 
 // Collection References
@@ -151,8 +152,40 @@ export const deleteEmployee = async (id: string) => {
     await deleteDoc(docRef);
 };
 
+// Customers
+export const addCustomer = async (customer: Customer) => {
+    const { id, ...data } = customer;
+    // Use custom ID if provided, or let Firestore generate?
+    // App generates ID like CUST-1234. We can use that as doc ID or just store it.
+    // Existing code uses addDoc which generates new ID, but we pass id in object.
+    // Let's stick to addDoc pattern but maybe we should use setDoc if we want to preserve our ID?
+    // Existing code: const { id, ...data } = purchase; return await addDoc(...)
+    // This means Firestore ID != App ID. That's fine for now.
+    return await addDoc(collection(db, 'customers'), cleanData(data));
+};
+
+export const updateCustomer = async (id: string, data: Partial<Customer>) => {
+    // We need to find the doc by our custom ID or use Firestore ID?
+    // The subscribeToCollection maps doc.id to the object.id.
+    // So 'id' passed here IS the Firestore ID.
+    const docRef = doc(db, 'customers', id);
+    await updateDoc(docRef, cleanData(data));
+};
+
+// Subscriptions
+export const addSubscription = async (subscription: Subscription) => {
+    const { id, ...data } = subscription;
+    return await addDoc(collection(db, 'subscriptions'), cleanData(data));
+};
+
+export const updateSubscription = async (id: string, data: Partial<Subscription>) => {
+    const docRef = doc(db, 'subscriptions', id);
+    await updateDoc(docRef, cleanData(data));
+};
+
 export const checkFirebaseConnection = async () => {
     try {
+        await getDocs(query(collection(db, 'accounts'), limit(1)));
         const healthRef = doc(db, '_health', 'ping');
         await setDoc(healthRef, { timestamp: new Date() });
         return { success: true };

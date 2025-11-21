@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
-import { Account, PurchaseRequest, SaleRecord, JournalEntry, RevenueStream, TransactionStatus, UserRole, JournalLine, SubscriptionStatus, AccountType, Employee } from './types';
+import { Account, PurchaseRequest, SaleRecord, JournalEntry, RevenueStream, TransactionStatus, UserRole, JournalLine, SubscriptionStatus, AccountType, Employee, Customer, Subscription } from './types';
 import { toPersianDate } from './utils';
 import Dashboard from './components/Dashboard';
 import Expenses from './components/Expenses';
@@ -8,6 +8,7 @@ import Sales from './components/Sales';
 import Ledger from './components/Ledger';
 import Settings from './components/Settings';
 import Payroll from './components/Payroll';
+import SubscriptionManager from './components/SubscriptionManager';
 import { LayoutDashboard, ShoppingCart, PieChart, Book, Settings as SettingsIcon, Shield, Menu, X, Wallet, Users, Lock, LogIn } from 'lucide-react';
 import {
   seedDatabase,
@@ -24,10 +25,14 @@ import {
   addJournal as firestoreAddJournal,
   addEmployee as firestoreAddEmployee,
   deleteEmployee as firestoreDeleteEmployee,
+  addCustomer as firestoreAddCustomer,
+  updateCustomer as firestoreUpdateCustomer,
+  addSubscription as firestoreAddSubscription,
+  updateSubscription as firestoreUpdateSubscription,
   checkFirebaseConnection
 } from './services/firestore';
 
-type View = 'dashboard' | 'expenses' | 'sales' | 'ledger' | 'settings' | 'payroll';
+type View = 'dashboard' | 'expenses' | 'sales' | 'ledger' | 'settings' | 'payroll' | 'subscriptions';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('dashboard');
@@ -64,6 +69,8 @@ const App: React.FC = () => {
   const [sales, setSales] = useState<SaleRecord[]>([]);
   const [journals, setJournals] = useState<JournalEntry[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [useFirebase, setUseFirebase] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState<'checking' | 'connected' | 'error'>('checking');
   const [connectionError, setConnectionError] = useState<string>('');
@@ -98,6 +105,8 @@ const App: React.FC = () => {
       subscribeToCollection<SaleRecord>('sales', setSales);
       subscribeToCollection<JournalEntry>('journals', setJournals);
       subscribeToCollection<Employee>('employees', setEmployees);
+      subscribeToCollection<Customer>('customers', setCustomers);
+      subscribeToCollection<Subscription>('subscriptions', setSubscriptions);
 
       console.log('Subscriptions established');
       setUseFirebase(true);
@@ -242,6 +251,75 @@ const App: React.FC = () => {
       toast.success('پرسنل با موفقیت حذف شد (محلی)');
     }
   };
+
+  // Customer & Subscription Logic
+  const handleAddCustomer = async (customer: Customer) => {
+    if (useFirebase) {
+      try {
+        await firestoreAddCustomer(customer);
+        toast.success('مشتری جدید با موفقیت اضافه شد');
+      } catch (error) {
+        console.error('Firebase error, using local state:', error);
+        setUseFirebase(false);
+        setCustomers(prev => [...prev, customer]);
+        toast.success('مشتری جدید اضافه شد (ذخیره محلی)');
+      }
+    } else {
+      setCustomers(prev => [...prev, customer]);
+      toast.success('مشتری جدید با موفقیت اضافه شد (محلی)');
+    }
+  };
+
+  const handleUpdateCustomer = async (customer: Customer) => {
+    if (useFirebase) {
+      try {
+        await firestoreUpdateCustomer(customer.id, customer);
+        toast.success('اطلاعات مشتری به‌روزرسانی شد');
+      } catch (error) {
+        console.error('Firebase error, using local state:', error);
+        setUseFirebase(false);
+        setCustomers(prev => prev.map(c => c.id === customer.id ? customer : c));
+        toast.success('اطلاعات مشتری به‌روزرسانی شد (ذخیره محلی)');
+      }
+    } else {
+      setCustomers(prev => prev.map(c => c.id === customer.id ? customer : c));
+      toast.success('اطلاعات مشتری به‌روزرسانی شد (محلی)');
+    }
+  };
+
+  const handleAddSubscription = async (subscription: Subscription, sale: SaleRecord) => {
+    if (useFirebase) {
+      try {
+        await firestoreAddSubscription(subscription);
+        await firestoreAddSale(sale);
+
+        // Update customer's active subscription
+        const customer = customers.find(c => c.id === subscription.customerId);
+        if (customer) {
+          await firestoreUpdateCustomer(customer.id, { activeSubscriptionId: subscription.id });
+        }
+
+        toast.success('اشتراک با موفقیت ثبت شد');
+      } catch (error) {
+        console.error('Firebase error, using local state:', error);
+        setUseFirebase(false);
+        setSubscriptions(prev => [...prev, subscription]);
+        setSales(prev => [sale, ...prev]);
+        setCustomers(prev => prev.map(c =>
+          c.id === subscription.customerId ? { ...c, activeSubscriptionId: subscription.id } : c
+        ));
+        toast.success('اشتراک ثبت شد (ذخیره محلی)');
+      }
+    } else {
+      setSubscriptions(prev => [...prev, subscription]);
+      setSales(prev => [sale, ...prev]);
+      setCustomers(prev => prev.map(c =>
+        c.id === subscription.customerId ? { ...c, activeSubscriptionId: subscription.id } : c
+      ));
+      toast.success('اشتراک با موفقیت ثبت شد (محلی)');
+    }
+  };
+
 
   const handlePaySalary = async (emp: Employee, amount: number, date: string) => {
     // 1. Create Expense Transaction
@@ -717,7 +795,8 @@ const App: React.FC = () => {
     { id: 'dashboard', label: 'داشبورد', icon: LayoutDashboard, view: 'dashboard' },
     { id: 'expenses', label: 'خرید و هزینه', icon: ShoppingCart, view: 'expenses' },
     { id: 'sales', label: 'فروش و درآمد', icon: PieChart, view: 'sales' },
-    { id: 'payroll', label: 'حقوق و دستمزد', icon: Users, view: 'payroll' },
+    { id: 'subscriptions', label: 'مدیریت اشتراک‌ها', icon: Users, view: 'subscriptions' },
+    { id: 'payroll', label: 'حقوق و دستمزد', icon: Wallet, view: 'payroll' },
     { id: 'ledger', label: 'دفتر کل', icon: Book, view: 'ledger' },
     { id: 'settings', label: 'تنظیمات', icon: SettingsIcon, view: 'settings' },
   ];
@@ -774,6 +853,18 @@ const App: React.FC = () => {
             onAddEmployee={handleAddEmployee}
             onDeleteEmployee={handleDeleteEmployee}
             onPaySalary={handlePaySalary}
+          />
+        );
+      case 'subscriptions':
+        return (
+          <SubscriptionManager
+            customers={customers}
+            subscriptions={subscriptions}
+            sales={sales}
+            accounts={accounts}
+            onAddCustomer={handleAddCustomer}
+            onUpdateCustomer={handleUpdateCustomer}
+            onAddSubscription={handleAddSubscription}
           />
         );
       default:
