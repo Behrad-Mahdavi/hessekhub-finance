@@ -42,6 +42,15 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
     // Daily List Logic
     const today = new Date();
     const isTodayDelivery = isDeliveryDay(today);
+    const todayPersian = toPersianDate(today);
+
+    // Debug logging
+    console.log('=== Daily Delivery Debug ===');
+    console.log('Today:', todayPersian);
+    console.log('Is Delivery Day:', isTodayDelivery);
+    console.log('Total Customers:', customers.length);
+    console.log('Total Subscriptions:', subscriptions.length);
+    console.log('Active Subscriptions:', subscriptions.filter(s => s.status === 'ACTIVE').length);
 
     // Get unique customers with their ACTIVE subscription (not all subscriptions)
     const dailyDeliveries = customers
@@ -51,16 +60,24 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
                 ? subscriptions.find(s => s.id === customer.activeSubscriptionId && s.status === 'ACTIVE')
                 : subscriptions.find(s => s.customerId === customer.id && s.status === 'ACTIVE');
 
-            if (!activeSub) return null;
+            if (!activeSub) {
+                console.log(`Customer ${customer.name} has no active subscription (activeSubId: ${customer.activeSubscriptionId})`);
+                return null;
+            }
 
             // Check if today is within subscription range
-            const todayPersian = toPersianDate(today);
-            if (activeSub.startDate <= todayPersian && activeSub.endDate >= todayPersian) {
+            const inRange = activeSub.startDate <= todayPersian && activeSub.endDate >= todayPersian;
+            console.log(`Customer ${customer.name}: Sub ${activeSub.planName} (${activeSub.startDate} to ${activeSub.endDate}) - In Range: ${inRange}`);
+
+            if (inRange) {
                 return { sub: activeSub, customer };
             }
             return null;
         })
         .filter(item => item !== null) as { sub: Subscription; customer: Customer }[];
+
+    console.log('Daily Deliveries Count:', dailyDeliveries.length);
+    console.log('=========================');
 
     const handleCreateCustomer = (e: React.FormEvent) => {
         e.preventDefault();
