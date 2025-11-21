@@ -290,16 +290,20 @@ const App: React.FC = () => {
   const handleAddSubscription = async (subscription: Subscription, sale: SaleRecord) => {
     if (useFirebase) {
       try {
-        await firestoreAddSubscription(subscription);
+        // Add subscription to Firestore and get the generated ID
+        const subscriptionDocRef = await firestoreAddSubscription(subscription);
+        const firestoreSubscriptionId = subscriptionDocRef.id;
+
+        // Add sale to Firestore
         await firestoreAddSale(sale);
 
-        // Update customer's active subscription
+        // Update customer's active subscription with Firestore ID
         const customer = customers.find(c => c.id === subscription.customerId);
         if (customer) {
-          await firestoreUpdateCustomer(customer.id, { activeSubscriptionId: subscription.id });
+          await firestoreUpdateCustomer(customer.id, { activeSubscriptionId: firestoreSubscriptionId });
           // Update local state as well
           setCustomers(prev => prev.map(c =>
-            c.id === subscription.customerId ? { ...c, activeSubscriptionId: subscription.id } : c
+            c.id === subscription.customerId ? { ...c, activeSubscriptionId: firestoreSubscriptionId } : c
           ));
         }
 
