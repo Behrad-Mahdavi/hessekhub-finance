@@ -44,7 +44,8 @@ const App: React.FC = () => {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (passwordInput === 'Rahbaria1') {
+    const appPassword = import.meta.env.VITE_APP_PASSWORD;
+    if (passwordInput === appPassword) {
       setIsAuthenticated(true);
       localStorage.setItem('isAuthenticated', 'true');
       setAuthError(false);
