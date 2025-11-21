@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Account, AccountType, PurchaseRequest, TransactionStatus, UserRole } from '../types';
 import { toPersianDate, formatPrice } from '../utils';
-import { Plus, Check, X, FileText, Upload, Image as ImageIcon, Trash2, Search, Filter, BarChart3, Scale, CreditCard } from 'lucide-react';
+import { Plus, Check, X, FileText, Upload, Image as ImageIcon, Trash2, Search, Filter, BarChart3, Scale, CreditCard, AlertTriangle } from 'lucide-react';
 
 interface ExpensesProps {
   accounts: Account[];
@@ -26,7 +26,8 @@ const Expenses: React.FC<ExpensesProps> = ({ accounts, purchases, onAddPurchase,
     requester: 'کاربر جاری',
     quantity: '',
     unit: 'گرم',
-    paymentAccountId: ''
+    paymentAccountId: '',
+    isCredit: false
   });
 
   // Analysis State
@@ -47,7 +48,8 @@ const Expenses: React.FC<ExpensesProps> = ({ accounts, purchases, onAddPurchase,
       imageUrl: fileName ? 'uploaded-mock-url' : undefined,
       quantity: formData.quantity ? parseFloat(formData.quantity) : undefined,
       unit: formData.quantity ? formData.unit : undefined,
-      paymentAccountId: formData.paymentAccountId || undefined
+      paymentAccountId: formData.paymentAccountId,
+      isCredit: formData.isCredit
     };
     onAddPurchase(newPurchase);
     setShowForm(false);
@@ -212,22 +214,45 @@ const Expenses: React.FC<ExpensesProps> = ({ accounts, purchases, onAddPurchase,
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">پرداخت از حساب</label>
-                <div className="relative">
-                  <select
-                    value={formData.paymentAccountId}
-                    onChange={(e) => setFormData({ ...formData, paymentAccountId: e.target.value })}
-                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none appearance-none"
-                  >
-                    <option value="">انتخاب کنید...</option>
-                    {accounts.filter(a => a.type === AccountType.ASSET).map(account => (
-                      <option key={account.id} value={account.id}>{account.name} (موجودی: {account.balance.toLocaleString()})</option>
-                    ))}
-                  </select>
-                  <div className="absolute left-3 top-3.5 pointer-events-none text-slate-400">
-                    <CreditCard className="w-4 h-4" />
-                  </div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-medium text-slate-700">پرداخت از حساب</label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <div className="relative inline-flex items-center">
+                      <input
+                        type="checkbox"
+                        className="sr-only peer"
+                        checked={formData.isCredit}
+                        onChange={(e) => setFormData({ ...formData, isCredit: e.target.checked, paymentAccountId: '' })}
+                      />
+                      <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                    </div>
+                    <span className="text-xs font-bold text-indigo-600">خرید نسیه (جدید)</span>
+                  </label>
                 </div>
+
+                {!formData.isCredit ? (
+                  <div className="relative animate-fade-in">
+                    <select
+                      required={!formData.isCredit}
+                      value={formData.paymentAccountId}
+                      onChange={(e) => setFormData({ ...formData, paymentAccountId: e.target.value })}
+                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none appearance-none"
+                    >
+                      <option value="">انتخاب کنید...</option>
+                      {accounts.filter(a => a.type === AccountType.ASSET).map(account => (
+                        <option key={account.id} value={account.id}>{account.name} (موجودی: {account.balance.toLocaleString()})</option>
+                      ))}
+                    </select>
+                    <div className="absolute left-3 top-3.5 pointer-events-none text-slate-400">
+                      <CreditCard className="w-4 h-4" />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl text-xs text-amber-700 font-medium flex items-center gap-2 animate-fade-in">
+                    <AlertTriangle className="w-4 h-4" />
+                    این مبلغ به حساب "حساب‌های پرداختنی" اضافه می‌شود.
+                  </div>
+                )}
               </div>
             </div>
 

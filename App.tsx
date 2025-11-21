@@ -317,24 +317,30 @@ const App: React.FC = () => {
       // 2. Create Journal Entry (Debit Expense, Credit Asset)
       const expenseAccount = accounts.find(a => a.name === purchase.category) || accounts.find(a => a.type === AccountType.EXPENSE)!;
 
-      // Find a bank account to deduce money from (Ideally the first one or a default one)
-      // If paymentAccountId is set, use that. Otherwise find default.
-      let cashAccount = accounts.find(a => a.type === AccountType.ASSET)!;
-      if (purchase.paymentAccountId) {
-        const selectedAccount = accounts.find(a => a.id === purchase.paymentAccountId);
-        if (selectedAccount) cashAccount = selectedAccount;
+      // 2. Determine Credit Account (Source of funds or Liability)
+      let creditAccount: Account;
+
+      if (purchase.isCredit) {
+        // If Credit Purchase -> Accounts Payable (2010)
+        creditAccount = accounts.find(a => a.code === '2010') || accounts.find(a => a.type === AccountType.LIABILITY)!;
       } else {
-        cashAccount = accounts.find(a => a.type === AccountType.ASSET && (a.code === '1020' || a.name.includes('بانک'))) || accounts.find(a => a.type === AccountType.ASSET)!;
+        // If Cash Purchase -> Asset Account (Bank/Cash)
+        if (purchase.paymentAccountId) {
+          const selected = accounts.find(a => a.id === purchase.paymentAccountId);
+          creditAccount = selected || accounts.find(a => a.type === AccountType.ASSET)!;
+        } else {
+          creditAccount = accounts.find(a => a.type === AccountType.ASSET && (a.code === '1020' || a.name.includes('بانک'))) || accounts.find(a => a.type === AccountType.ASSET)!;
+        }
       }
 
       const journalEntry: JournalEntry = {
         id: `JRN-${Math.floor(Math.random() * 100000)}`,
         date: toPersianDate(new Date()),
-        description: `خرید تایید شده: ${purchase.supplier}`,
+        description: `خرید تایید شده: ${purchase.supplier} ${purchase.isCredit ? '(نسیه)' : ''}`,
         referenceId: purchase.id,
         lines: [
           { accountId: expenseAccount.id, accountName: expenseAccount.name, debit: purchase.amount, credit: 0 },
-          { accountId: cashAccount.id, accountName: cashAccount.name, debit: 0, credit: purchase.amount },
+          { accountId: creditAccount.id, accountName: creditAccount.name, debit: 0, credit: purchase.amount },
         ]
       };
 
@@ -343,18 +349,34 @@ const App: React.FC = () => {
           // 1. Update Purchase Status
           await firestoreUpdatePurchase(id, { status: TransactionStatus.APPROVED });
           await firestoreAddJournal(journalEntry);
+
           // 3. Update Account Balances
           await firestoreUpdateAccount(expenseAccount.id, { balance: expenseAccount.balance + purchase.amount });
-          await firestoreUpdateAccount(cashAccount.id, { balance: cashAccount.balance - purchase.amount });
+
+          // For Credit Account:
+          // If Asset (Cash/Bank) -> Decrease Balance (Credit)
+          // If Liability (Accounts Payable) -> Increase Balance (Credit)
+          const newCreditBalance = creditAccount.type === AccountType.LIABILITY
+            ? creditAccount.balance + purchase.amount
+            : creditAccount.balance - purchase.amount;
+
+          await firestoreUpdateAccount(creditAccount.id, { balance: newCreditBalance });
           toast.success('خرید با موفقیت تایید شد');
         } catch (error) {
-          console.error('Firebase error, using local state:', error);
-          setUseFirebase(false);
+          // Local Fallback
           setPurchases(prev => prev.map(p => p.id === id ? { ...p, status: TransactionStatus.APPROVED } : p));
           setJournals(prev => [...prev, journalEntry]);
+
           setAccounts(prev => prev.map(acc => {
             if (acc.id === expenseAccount.id) return { ...acc, balance: acc.balance + purchase.amount };
-            if (acc.id === cashAccount.id) return { ...acc, balance: acc.balance - purchase.amount };
+            if (acc.id === creditAccount.id) {
+              return {
+                ...acc,
+                balance: acc.type === AccountType.LIABILITY
+                  ? acc.balance + purchase.amount
+                  : acc.balance - purchase.amount
+              };
+            }
             return acc;
           }));
           toast.success('خرید تایید شد (ذخیره محلی)');
@@ -362,9 +384,17 @@ const App: React.FC = () => {
       } else {
         setPurchases(prev => prev.map(p => p.id === id ? { ...p, status: TransactionStatus.APPROVED } : p));
         setJournals(prev => [...prev, journalEntry]);
+
         setAccounts(prev => prev.map(acc => {
           if (acc.id === expenseAccount.id) return { ...acc, balance: acc.balance + purchase.amount };
-          if (acc.id === cashAccount.id) return { ...acc, balance: acc.balance - purchase.amount };
+          if (acc.id === creditAccount.id) {
+            return {
+              ...acc,
+              balance: acc.type === AccountType.LIABILITY
+                ? acc.balance + purchase.amount
+                : acc.balance - purchase.amount
+            };
+          }
           return acc;
         }));
         toast.success('خرید با موفقیت تایید شد (محلی)');

@@ -68,6 +68,7 @@ export interface PurchaseRequest {
   quantity?: number; // New: Amount in units (e.g., 5000)
   unit?: string;    // New: Unit name (e.g., Grams)
   paymentAccountId?: string; // New: ID of the asset account used for payment
+  isCredit?: boolean; // New: If true, this is a credit purchase (Accounts Payable)
 }
 
 export interface SaleRecord {
