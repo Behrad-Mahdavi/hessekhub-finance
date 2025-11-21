@@ -299,7 +299,14 @@ const App: React.FC = () => {
       const expenseAccount = accounts.find(a => a.name === purchase.category) || accounts.find(a => a.type === AccountType.EXPENSE)!;
 
       // Find a bank account to deduce money from (Ideally the first one or a default one)
-      const cashAccount = accounts.find(a => a.type === AccountType.ASSET && (a.code === '1020' || a.name.includes('بانک'))) || accounts.find(a => a.type === AccountType.ASSET)!;
+      // If paymentAccountId is set, use that. Otherwise find default.
+      let cashAccount = accounts.find(a => a.type === AccountType.ASSET)!;
+      if (purchase.paymentAccountId) {
+        const selectedAccount = accounts.find(a => a.id === purchase.paymentAccountId);
+        if (selectedAccount) cashAccount = selectedAccount;
+      } else {
+        cashAccount = accounts.find(a => a.type === AccountType.ASSET && (a.code === '1020' || a.name.includes('بانک'))) || accounts.find(a => a.type === AccountType.ASSET)!;
+      }
 
       const journalEntry: JournalEntry = {
         id: `JRN-${Math.floor(Math.random() * 100000)}`,
@@ -796,6 +803,7 @@ const App: React.FC = () => {
         )}
         {currentView === 'expenses' && (
           <Expenses
+            accounts={accounts}
             purchases={purchases}
             onAddPurchase={handleAddPurchase}
             onApprovePurchase={handleApprovePurchase}

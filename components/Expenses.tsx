@@ -1,16 +1,17 @@
 import React, { useState, useMemo } from 'react';
-import { PurchaseRequest, TransactionStatus, UserRole } from '../types';
+import { Account, AccountType, PurchaseRequest, TransactionStatus, UserRole } from '../types';
 import { toPersianDate } from '../utils';
-import { Plus, Check, X, FileText, Upload, Image as ImageIcon, Trash2, Search, Filter, BarChart3, Scale } from 'lucide-react';
+import { Plus, Check, X, FileText, Upload, Image as ImageIcon, Trash2, Search, Filter, BarChart3, Scale, CreditCard } from 'lucide-react';
 
 interface ExpensesProps {
+  accounts: Account[];
   purchases: PurchaseRequest[];
   onAddPurchase: (p: PurchaseRequest) => void;
   onApprovePurchase: (id: string) => void;
   onRejectPurchase: (id: string) => void;
 }
 
-const Expenses: React.FC<ExpensesProps> = ({ purchases, onAddPurchase, onApprovePurchase, onRejectPurchase }) => {
+const Expenses: React.FC<ExpensesProps> = ({ accounts, purchases, onAddPurchase, onApprovePurchase, onRejectPurchase }) => {
   const [showForm, setShowForm] = useState(false);
   const [fileName, setFileName] = useState<string>('');
   const [selectedPurchase, setSelectedPurchase] = useState<PurchaseRequest | null>(null);
@@ -23,7 +24,8 @@ const Expenses: React.FC<ExpensesProps> = ({ purchases, onAddPurchase, onApprove
     description: '',
     requester: 'کاربر جاری',
     quantity: '',
-    unit: 'گرم'
+    unit: 'گرم',
+    paymentAccountId: ''
   });
 
   // Analysis State
@@ -43,11 +45,12 @@ const Expenses: React.FC<ExpensesProps> = ({ purchases, onAddPurchase, onApprove
       date: toPersianDate(new Date()),
       imageUrl: fileName ? 'uploaded-mock-url' : undefined,
       quantity: formData.quantity ? parseFloat(formData.quantity) : undefined,
-      unit: formData.quantity ? formData.unit : undefined
+      unit: formData.quantity ? formData.unit : undefined,
+      paymentAccountId: formData.paymentAccountId || undefined
     };
     onAddPurchase(newPurchase);
     setShowForm(false);
-    setFormData({ amount: '', category: 'هزینه مواد اولیه', supplier: '', description: '', requester: 'کاربر جاری', quantity: '', unit: 'گرم' });
+    setFormData({ amount: '', category: 'هزینه مواد اولیه', supplier: '', description: '', requester: 'کاربر جاری', quantity: '', unit: 'گرم', paymentAccountId: '' });
     setFileName('');
   };
 
@@ -203,6 +206,25 @@ const Expenses: React.FC<ExpensesProps> = ({ purchases, onAddPurchase, onApprove
                 </select>
                 <div className="absolute left-3 top-3.5 pointer-events-none text-slate-400">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">پرداخت از حساب</label>
+                <div className="relative">
+                  <select
+                    value={formData.paymentAccountId}
+                    onChange={(e) => setFormData({ ...formData, paymentAccountId: e.target.value })}
+                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none appearance-none"
+                  >
+                    <option value="">انتخاب کنید...</option>
+                    {accounts.filter(a => a.type === AccountType.ASSET).map(account => (
+                      <option key={account.id} value={account.id}>{account.name} (موجودی: {account.balance.toLocaleString()})</option>
+                    ))}
+                  </select>
+                  <div className="absolute left-3 top-3.5 pointer-events-none text-slate-400">
+                    <CreditCard className="w-4 h-4" />
+                  </div>
                 </div>
               </div>
             </div>

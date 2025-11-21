@@ -67,6 +67,7 @@ export interface PurchaseRequest {
   imageUrl?: string;
   quantity?: number; // New: Amount in units (e.g., 5000)
   unit?: string;    // New: Unit name (e.g., Grams)
+  paymentAccountId?: string; // New: ID of the asset account used for payment
 }
 
 export interface SaleRecord {
