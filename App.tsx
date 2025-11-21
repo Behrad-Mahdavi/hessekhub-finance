@@ -8,7 +8,7 @@ import Sales from './components/Sales';
 import Ledger from './components/Ledger';
 import Settings from './components/Settings';
 import Payroll from './components/Payroll';
-import { LayoutDashboard, ShoppingCart, PieChart, Book, Settings as SettingsIcon, Shield, Menu, X, Wallet, Users } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, PieChart, Book, Settings as SettingsIcon, Shield, Menu, X, Wallet, Users, Lock, LogIn } from 'lucide-react';
 import {
   seedDatabase,
   subscribeToCollection,
@@ -31,6 +31,29 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [passwordInput, setPasswordInput] = useState('');
+  const [authError, setAuthError] = useState(false);
+
+  useEffect(() => {
+    const savedAuth = localStorage.getItem('isAuthenticated');
+    if (savedAuth === 'true') {
+      setIsAuthenticated(true);
+    }
+  }, []);
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (passwordInput === 'Rahbaria1') {
+      setIsAuthenticated(true);
+      localStorage.setItem('isAuthenticated', 'true');
+      setAuthError(false);
+      toast.success('خوش آمدید');
+    } else {
+      setAuthError(true);
+      toast.error('رمز عبور اشتباه است');
+    }
+  };
 
   // Global State (Now from Firestore)
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -603,6 +626,51 @@ const App: React.FC = () => {
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-slate-600 text-lg">در حال بارگذاری...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-slate-900 text-white font-sans">
+        <Toaster position="top-center" />
+        <div className="w-full max-w-md p-8 bg-slate-800 rounded-2xl shadow-2xl border border-slate-700">
+          <div className="flex flex-col items-center mb-8">
+            <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-indigo-500/30">
+              <Lock className="w-8 h-8 text-white" />
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight">سیستم مالی حس خوب</h1>
+            <p className="text-slate-400 mt-2 text-sm">لطفاً برای ورود رمز عبور را وارد کنید</p>
+          </div>
+
+          <form onSubmit={handleLogin} className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">رمز عبور</label>
+              <input
+                type="password"
+                value={passwordInput}
+                onChange={(e) => {
+                  setPasswordInput(e.target.value);
+                  setAuthError(false);
+                }}
+                className={`w-full p-4 bg-slate-900 border ${authError ? 'border-rose-500 focus:ring-rose-500' : 'border-slate-600 focus:ring-indigo-500'} rounded-xl focus:ring-2 outline-none transition-all text-center tracking-widest text-lg placeholder:tracking-normal`}
+                placeholder="••••••••"
+                autoFocus
+              />
+            </div>
+            <button
+              type="submit"
+              className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-indigo-900/20 flex items-center justify-center gap-2"
+            >
+              <LogIn className="w-5 h-5" />
+              ورود به سیستم
+            </button>
+          </form>
+
+          <div className="mt-8 text-center">
+            <p className="text-xs text-slate-500">نسخه ۱.۲.۰ | طراحی شده با ❤️</p>
+          </div>
         </div>
       </div>
     );
