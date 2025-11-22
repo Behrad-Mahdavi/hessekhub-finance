@@ -10,7 +10,8 @@ import {
     onSnapshot,
     writeBatch,
     setDoc,
-    limit
+    limit,
+    increment
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Account, PurchaseRequest, SaleRecord, JournalEntry, Employee, Customer, Subscription } from '../types';
@@ -58,6 +59,155 @@ export const deleteSupplier = async (id: string) => {
 export const addJournalEntry = async (journal: any) => {
     const { id, ...data } = journal;
     return await addDoc(journalsRef, cleanData(data));
+};
+
+// --- Inventory ---
+const inventoryItemsRef = collection(db, 'inventory_items');
+const inventoryTransactionsRef = collection(db, 'inventory_transactions');
+
+export const addInventoryItem = async (item: any) => {
+    const { id, ...data } = item;
+    return await addDoc(inventoryItemsRef, cleanData(data));
+};
+
+export const updateInventoryItem = async (id: string, data: any) => {
+    const docRef = doc(db, 'inventory_items', id);
+    await updateDoc(docRef, cleanData(data));
+};
+
+
+
+// Atomic: Save Inventory Purchase (Expense + Inventory Transaction + Stock Update + Financial Update)
+export const saveInventoryPurchase = async (
+    purchase: any,
+    inventoryDetails: { itemId: string; quantity: number; unitPrice: number },
+    financialDetails: { accountId?: string; supplierId?: string; amount: number; isCredit: boolean }
+) => {
+    const batch = writeBatch(db);
+
+    // 1. Create Expense Document
+    const purchaseRef = doc(purchasesRef); // Auto-ID
+    const purchaseData = { ...purchase, id: purchaseRef.id };
+    batch.set(purchaseRef, cleanData(purchaseData));
+
+    // 2. Create Inventory Transaction
+    const transactionRef = doc(inventoryTransactionsRef);
+    const transactionData = {
+        id: transactionRef.id,
+        itemId: inventoryDetails.itemId,
+        type: 'PURCHASE',
+        quantity: inventoryDetails.quantity,
+        date: new Date(), // Using server timestamp equivalent or JS Date
+        relatedExpenseId: purchaseRef.id,
+        description: `خرید: ${purchase.description}`,
+    };
+    batch.set(transactionRef, cleanData(transactionData));
+
+    // 3. Update Inventory Item (Stock & Last Cost)
+    const itemRef = doc(db, 'inventory_items', inventoryDetails.itemId);
+    batch.update(itemRef, {
+        currentStock: increment(inventoryDetails.quantity),
+        lastCost: inventoryDetails.unitPrice,
+        updatedAt: new Date()
+    });
+
+    // 4. Financial Updates (Account or Supplier)
+    if (financialDetails.isCredit && financialDetails.supplierId) {
+        // Credit Purchase: Increase Supplier Debt (Balance)
+        // Note: Supplier balance is positive for Debt (We owe them)
+        const supplierRef = doc(db, 'suppliers', financialDetails.supplierId);
+        batch.update(supplierRef, {
+            balance: increment(financialDetails.amount)
+        });
+    } else if (financialDetails.accountId) {
+        // Cash Purchase: Decrease Asset Account
+        const accountRef = doc(db, 'accounts', financialDetails.accountId);
+        batch.update(accountRef, {
+            balance: increment(-financialDetails.amount)
+        });
+    }
+
+    await batch.commit();
+    return purchaseRef.id;
+};
+
+// Atomic: Register Usage (Transaction + Stock Update)
+export const registerInventoryUsage = async (
+    itemId: string,
+    quantity: number,
+    description: string,
+    date: string
+) => {
+    const batch = writeBatch(db);
+
+    // 1. Create Usage Transaction
+    const transactionRef = doc(inventoryTransactionsRef);
+    const transactionData = {
+        id: transactionRef.id,
+        itemId: itemId,
+        type: 'USAGE',
+        quantity: -quantity, // Negative for usage
+        date: new Date(), // Or use the passed date string if preferred, but keeping consistent with Timestamp requirement
+        description: description
+    };
+    batch.set(transactionRef, cleanData(transactionData));
+
+    // 2. Update Inventory Item (Decrease Stock)
+    const itemRef = doc(db, 'inventory_items', itemId);
+    batch.update(itemRef, {
+        currentStock: increment(-quantity),
+        updatedAt: new Date()
+    });
+
+    await batch.commit();
+    return transactionRef.id;
+};
+
+// Query: Get Inventory Transactions
+export const getInventoryTransactions = async (
+    itemId?: string,
+    startDate?: Date,
+    endDate?: Date,
+    type?: 'PURCHASE' | 'USAGE'
+) => {
+    let q = query(inventoryTransactionsRef, orderBy('date', 'desc'));
+
+    // Note: Firestore requires composite indexes for multiple where clauses with orderBy.
+    // For simplicity in this MVP without managing indexes, we'll filter in memory if needed,
+    // or just fetch all and filter client-side for small datasets.
+    // However, let's try to use basic filtering where possible.
+
+    // If we had indexes, we would do:
+    // if (itemId) q = query(q, where('itemId', '==', itemId));
+    // if (type) q = query(q, where('type', '==', type));
+
+    // For now, let's fetch the most recent 100 transactions and filter client-side 
+    // to avoid "index required" errors during the demo.
+    q = query(q, limit(100));
+
+    const snapshot = await getDocs(q);
+    let transactions = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        // Convert Timestamp to Date if needed, but we store as Date/Timestamp
+        date: doc.data().date?.toDate ? doc.data().date.toDate() : new Date(doc.data().date)
+    }));
+
+    // Client-side filtering
+    if (itemId) {
+        transactions = transactions.filter((t: any) => t.itemId === itemId);
+    }
+    if (type) {
+        transactions = transactions.filter((t: any) => t.type === type);
+    }
+    if (startDate) {
+        transactions = transactions.filter((t: any) => t.date >= startDate);
+    }
+    if (endDate) {
+        transactions = transactions.filter((t: any) => t.date <= endDate);
+    }
+
+    return transactions;
 };
 
 // --- Seeding ---

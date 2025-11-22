@@ -70,6 +70,12 @@ export interface PurchaseRequest {
   unit?: string;    // New: Unit name (e.g., Grams)
   paymentAccountId?: string; // New: ID of the asset account used for payment
   isCredit?: boolean; // New: If true, this is a credit purchase (Accounts Payable)
+  isInventoryPurchase?: boolean; // New: Flag for inventory purchase
+  inventoryDetails?: {
+    itemId: string;
+    quantity: number;
+    unitPrice: number;
+  };
 }
 
 export interface Supplier {
@@ -149,4 +155,24 @@ export interface FinancialSummary {
   netProfit: number;
   cashBalance: number;
   revenueByStream: Record<string, number>;
+}
+
+export interface InventoryItem {
+  id: string;
+  name: string;
+  unit: string; // 'kg', 'gr', 'l', 'num'
+  currentStock: number;
+  reorderPoint: number;
+  lastCost: number;
+  updatedAt: any; // Timestamp
+}
+
+export interface InventoryTransaction {
+  id: string;
+  itemId: string;
+  type: 'PURCHASE' | 'USAGE' | 'ADJUSTMENT' | 'RETURN';
+  quantity: number; // Positive for entry, Negative for exit
+  date: any; // Timestamp
+  relatedExpenseId?: string;
+  description?: string;
 }

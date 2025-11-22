@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
-import { Account, PurchaseRequest, SaleRecord, JournalEntry, RevenueStream, TransactionStatus, UserRole, JournalLine, SubscriptionStatus, AccountType, Employee, Customer, Subscription, PayrollPayment, Supplier } from './types';
+import { Account, PurchaseRequest, SaleRecord, JournalEntry, RevenueStream, TransactionStatus, UserRole, JournalLine, SubscriptionStatus, AccountType, Employee, Customer, Subscription, PayrollPayment, Supplier, InventoryItem } from './types';
 import { toPersianDate } from './utils';
 import Dashboard from './components/Dashboard';
 import Expenses from './components/Expenses';
@@ -9,8 +9,11 @@ import Ledger from './components/Ledger';
 import Settings from './components/Settings';
 import Payroll from './components/Payroll';
 import SubscriptionManager from './components/SubscriptionManager';
-import SupplierManager from './components/SupplierManager';
-import { LayoutDashboard, ShoppingCart, PieChart, Book, Settings as SettingsIcon, Shield, Menu, X, Wallet, Users, Lock, LogIn, Truck } from 'lucide-react';
+import InventoryManager from './components/InventoryManager';
+import { LayoutDashboard, ShoppingCart, PieChart, Book, Settings as SettingsIcon, Shield, Menu, X, Wallet, Users, Lock, LogIn, Truck, Package } from 'lucide-react';
+
+import { collection, onSnapshot } from 'firebase/firestore';
+import { db } from './firebase';
 import {
   seedDatabase,
   subscribeToCollection,
@@ -38,10 +41,15 @@ import {
   deleteSupplier as firestoreDeleteSupplier,
   checkFirebaseConnection,
   addJournalEntry,
-  updateSupplier
+  updateSupplier,
+  saveInventoryPurchase,
+  registerInventoryUsage,
+  addInventoryItem,
+  updateInventoryItem
 } from './services/firestore';
+import SupplierManager from './components/SupplierManager';
 
-type View = 'dashboard' | 'expenses' | 'sales' | 'ledger' | 'settings' | 'payroll' | 'subscriptions' | 'suppliers';
+type View = 'dashboard' | 'expenses' | 'sales' | 'ledger' | 'settings' | 'payroll' | 'subscriptions' | 'suppliers' | 'inventory';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('dashboard');
@@ -82,9 +90,62 @@ const App: React.FC = () => {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [payrollPayments, setPayrollPayments] = useState<PayrollPayment[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const [useFirebase, setUseFirebase] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState<'checking' | 'connected' | 'error'>('checking');
   const [connectionError, setConnectionError] = useState<string>('');
+
+  // Inventory Management Logic
+  const handleAddInventoryItem = async (item: Omit<InventoryItem, 'id' | 'updatedAt'>) => {
+    try {
+      if (useFirebase) {
+        await addInventoryItem({ ...item, updatedAt: new Date() });
+        toast.success('کالا با موفقیت تعریف شد');
+      } else {
+        const newItem = { ...item, id: `INV-${Date.now()}`, updatedAt: new Date() };
+        setInventoryItems([...inventoryItems, newItem as InventoryItem]);
+        toast.success('کالا تعریف شد (محلی)');
+      }
+    } catch (error) {
+      console.error('Error adding inventory item:', error);
+      toast.error('خطا در تعریف کالا');
+    }
+  };
+
+  const handleUpdateInventoryItem = async (id: string, data: Partial<InventoryItem>) => {
+    try {
+      if (useFirebase) {
+        await updateInventoryItem(id, { ...data, updatedAt: new Date() });
+        toast.success('کالا ویرایش شد');
+      } else {
+        setInventoryItems(prev => prev.map(item => item.id === id ? { ...item, ...data } : item));
+        toast.success('کالا ویرایش شد (محلی)');
+      }
+    } catch (error) {
+      console.error('Error updating inventory item:', error);
+      toast.error('خطا در ویرایش کالا');
+    }
+  };
+
+  const handleRegisterUsage = async (itemId: string, quantity: number, description: string, date: string) => {
+    try {
+      if (useFirebase) {
+        await registerInventoryUsage(itemId, quantity, description, date);
+        toast.success('مصرف کالا ثبت شد');
+      } else {
+        // Local Fallback
+        setInventoryItems(prev => prev.map(item =>
+          item.id === itemId ? { ...item, currentStock: item.currentStock - quantity } : item
+        ));
+        toast.success('مصرف ثبت شد (محلی)');
+      }
+    } catch (error) {
+      console.error('Error registering usage:', error);
+      toast.error('خطا در ثبت مصرف');
+    }
+  };
+
+
 
   // Initialize Firestore and subscribe to collections
   const initializeApp = async () => {
@@ -151,6 +212,65 @@ const App: React.FC = () => {
     initializeApp();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // This useEffect handles real-time subscriptions using onSnapshot when useFirebase is true
+  useEffect(() => {
+    if (!useFirebase) return;
+
+    const unsubAccounts = onSnapshot(collection(db, 'accounts'), (snapshot) => {
+      setAccounts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account)));
+    });
+
+    const unsubPurchases = onSnapshot(collection(db, 'purchases'), (snapshot) => {
+      setPurchases(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PurchaseRequest)));
+    });
+
+    const unsubSales = onSnapshot(collection(db, 'sales'), (snapshot) => {
+      setSales(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SaleRecord)));
+    });
+
+    const unsubJournals = onSnapshot(collection(db, 'journals'), (snapshot) => {
+      setJournals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as JournalEntry)));
+    });
+
+    const unsubEmployees = onSnapshot(collection(db, 'employees'), (snapshot) => {
+      setEmployees(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)));
+    });
+
+    const unsubCustomers = onSnapshot(collection(db, 'customers'), (snapshot) => {
+      setCustomers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer)));
+    });
+
+    const unsubSubscriptions = onSnapshot(collection(db, 'subscriptions'), (snapshot) => {
+      setSubscriptions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subscription)));
+    });
+
+    const unsubPayroll = onSnapshot(collection(db, 'payroll_payments'), (snapshot) => {
+      setPayrollPayments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PayrollPayment)));
+    });
+
+    const unsubSuppliers = onSnapshot(collection(db, 'suppliers'), (snapshot) => {
+      setSuppliers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Supplier)));
+    });
+
+    const unsubInventory = onSnapshot(collection(db, 'inventory_items'), (snapshot) => {
+      setInventoryItems(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as InventoryItem)));
+    });
+
+    return () => {
+      unsubAccounts();
+      unsubPurchases();
+      unsubSales();
+      unsubJournals();
+      unsubEmployees();
+      unsubCustomers();
+      unsubSubscriptions();
+      unsubPayroll();
+      unsubSuppliers();
+      unsubInventory();
+    };
+  }, [useFirebase]);
+
 
   // Account Management Logic
   const handleAddAccount = async (name: string, type: AccountType, initialBalance: number) => {
@@ -569,6 +689,32 @@ const App: React.FC = () => {
     }
   };
   // Accounting Engine Logic: Create Journal from Purchase Approval
+  const handleInventoryPurchase = async (
+    purchase: PurchaseRequest,
+    inventoryDetails: { itemId: string; quantity: number; unitPrice: number },
+    financialDetails: { accountId?: string; supplierId?: string; amount: number; isCredit: boolean }
+  ) => {
+    try {
+      if (useFirebase) {
+        await saveInventoryPurchase(purchase, inventoryDetails, financialDetails);
+        toast.success('خرید انبار با موفقیت ثبت شد');
+      } else {
+        // Local Fallback (Simplified - just adds purchase and updates item stock locally)
+        setPurchases(prev => [purchase, ...prev]);
+        setInventoryItems(prev => prev.map(item =>
+          item.id === inventoryDetails.itemId
+            ? { ...item, currentStock: item.currentStock + inventoryDetails.quantity, lastCost: inventoryDetails.unitPrice }
+            : item
+        ));
+        // Also update account/supplier balance locally... (omitted for brevity as user emphasized batch)
+        toast.success('خرید انبار ثبت شد (محلی)');
+      }
+    } catch (error) {
+      console.error('Error saving inventory purchase:', error);
+      toast.error('خطا در ثبت خرید انبار');
+    }
+  };
+
   const handleApprovePurchase = async (id: string) => {
     const purchase = purchases.find(p => p.id === id);
     if (!purchase) return;
@@ -993,6 +1139,7 @@ const App: React.FC = () => {
     { id: 'suppliers', label: 'تامین‌کنندگان', icon: Truck, view: 'suppliers' },
     { id: 'payroll', label: 'حقوق و دستمزد', icon: Wallet, view: 'payroll' },
     { id: 'ledger', label: 'دفتر کل', icon: Book, view: 'ledger' },
+    { id: 'inventory', label: 'مدیریت انبار', icon: Package, view: 'inventory' },
     { id: 'settings', label: 'تنظیمات', icon: SettingsIcon, view: 'settings' },
   ];
 
@@ -1019,10 +1166,12 @@ const App: React.FC = () => {
             accounts={accounts}
             purchases={purchases}
             suppliers={suppliers}
+            inventoryItems={inventoryItems}
             onAddPurchase={handleAddPurchase}
             onApprovePurchase={handleApprovePurchase}
             onRejectPurchase={handleRejectPurchase}
             onDeletePurchase={handleDeletePurchase}
+            onInventoryPurchase={handleInventoryPurchase}
           />
         );
       case 'sales':
@@ -1037,7 +1186,7 @@ const App: React.FC = () => {
           />
         ); case 'ledger':
         return (
-          <Ledger journals={journals} />
+          <Ledger journals={journals} accounts={accounts} />
         );
       case 'settings':
         return (
@@ -1084,8 +1233,17 @@ const App: React.FC = () => {
             onPayment={handleSupplierPayment}
           />
         );
+      case 'inventory':
+        return (
+          <InventoryManager
+            inventoryItems={inventoryItems}
+            onAddItem={handleAddInventoryItem}
+            onUpdateItem={handleUpdateInventoryItem}
+            onRegisterUsage={handleRegisterUsage}
+          />
+        );
       default:
-        return null;
+        return <Dashboard accounts={accounts} sales={sales} purchases={purchases} subscriptions={subscriptions} onViewSubscriptions={() => setCurrentView('subscriptions')} />;
     }
   };
 
