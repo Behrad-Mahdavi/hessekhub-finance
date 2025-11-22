@@ -1005,7 +1005,13 @@ const App: React.FC = () => {
     switch (currentView) {
       case 'dashboard':
         return (
-          <Dashboard accounts={accounts} sales={sales} purchases={purchases} />
+          <Dashboard
+            accounts={accounts}
+            sales={sales}
+            purchases={purchases}
+            subscriptions={subscriptions}
+            onViewSubscriptions={() => setCurrentView('subscriptions')}
+          />
         );
       case 'expenses':
         return (

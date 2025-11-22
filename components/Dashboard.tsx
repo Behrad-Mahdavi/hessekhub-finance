@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { TrendingUp, CreditCard, AlertCircle, Repeat, Coffee } from 'lucide-react';
-import { Account, SaleRecord, PurchaseRequest, AccountType, RevenueStream, SubscriptionStatus, TransactionStatus } from '../types';
+import { Account, SaleRecord, PurchaseRequest, AccountType, RevenueStream, SubscriptionStatus, TransactionStatus, Subscription } from '../types';
 
 import { toPersianDate, getDurationInMonths } from '../utils';
 
@@ -9,9 +9,11 @@ interface DashboardProps {
   accounts: Account[];
   sales: SaleRecord[];
   purchases: PurchaseRequest[];
+  subscriptions: Subscription[];
+  onViewSubscriptions: () => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ accounts, sales, purchases }) => {
+const Dashboard: React.FC<DashboardProps> = ({ accounts, sales, purchases, subscriptions, onViewSubscriptions }) => {
   const [daysRange, setDaysRange] = useState<number>(7);
 
 
@@ -25,14 +27,18 @@ const Dashboard: React.FC<DashboardProps> = ({ accounts, sales, purchases }) => 
   // 2. Calculate Specific Business KPIs (Brief Requirements)
 
   // MRR (Monthly Recurring Revenue)
-  const activeSubscriptions = sales.filter(s =>
-    s.stream === RevenueStream.SUBSCRIPTION &&
-    s.subscriptionStatus === SubscriptionStatus.ACTIVE
-  );
+  // Calculated from active subscriptions
+  const activeSubs = subscriptions.filter(s => s.status === 'ACTIVE');
 
-  const mrr = activeSubscriptions.reduce((total, sub) => {
-    const months = getDurationInMonths(sub.duration);
-    return total + (sub.amount / months);
+  const mrr = activeSubs.reduce((total, sub) => {
+    // Calculate monthly value
+    // If plan is "1 Month" or similar, it's the price.
+    // If it's "2 Weeks", we multiply by 2 (approx).
+    // Better: (Price / Total Days) * 30
+    if (sub.totalDeliveryDays > 0) {
+      return total + ((sub.price / sub.totalDeliveryDays) * 30); // Normalized to 30 days
+    }
+    return total + sub.price; // Fallback
   }, 0);
 
   // Daily Cafe Revenue
@@ -98,7 +104,10 @@ const Dashboard: React.FC<DashboardProps> = ({ accounts, sales, purchases }) => 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4 md:gap-6">
 
         {/* MRR Card */}
-        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow relative overflow-hidden group">
+        <div
+          onClick={onViewSubscriptions}
+          className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow relative overflow-hidden group cursor-pointer"
+        >
           <div className="absolute top-0 right-0 w-1 h-full bg-indigo-500"></div>
           <div className="flex items-center justify-between mb-2">
             <p className="text-xs font-bold text-slate-500 uppercase">MRR اشتراک‌ها</p>
