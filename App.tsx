@@ -692,21 +692,47 @@ const App: React.FC = () => {
   const handleInventoryPurchase = async (
     purchase: PurchaseRequest,
     inventoryDetails: { itemId: string; quantity: number; unitPrice: number },
-    financialDetails: { accountId?: string; supplierId?: string; amount: number; isCredit: boolean }
+    financialDetails: { accountId?: string; supplierId?: string; expenseAccountId?: string; amount: number; isCredit: boolean }
   ) => {
     try {
       if (useFirebase) {
         await saveInventoryPurchase(purchase, inventoryDetails, financialDetails);
         toast.success('خرید انبار با موفقیت ثبت شد');
       } else {
-        // Local Fallback (Simplified - just adds purchase and updates item stock locally)
+        // Local Fallback
+        // 1. Add Purchase
         setPurchases(prev => [purchase, ...prev]);
+
+        // 2. Update Inventory Stock
         setInventoryItems(prev => prev.map(item =>
           item.id === inventoryDetails.itemId
             ? { ...item, currentStock: item.currentStock + inventoryDetails.quantity, lastCost: inventoryDetails.unitPrice }
             : item
         ));
-        // Also update account/supplier balance locally... (omitted for brevity as user emphasized batch)
+
+        // 3. Financial Updates (Local)
+        if (financialDetails.expenseAccountId) {
+          setAccounts(prev => prev.map(a =>
+            a.id === financialDetails.expenseAccountId
+              ? { ...a, balance: a.balance + financialDetails.amount }
+              : a
+          ));
+        }
+
+        if (financialDetails.isCredit && financialDetails.supplierId) {
+          setSuppliers(prev => prev.map(s =>
+            s.id === financialDetails.supplierId
+              ? { ...s, balance: s.balance + financialDetails.amount }
+              : s
+          ));
+        } else if (financialDetails.accountId) {
+          setAccounts(prev => prev.map(a =>
+            a.id === financialDetails.accountId
+              ? { ...a, balance: a.balance - financialDetails.amount }
+              : a
+          ));
+        }
+
         toast.success('خرید انبار ثبت شد (محلی)');
       }
     } catch (error) {

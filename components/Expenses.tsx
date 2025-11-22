@@ -15,7 +15,7 @@ interface ExpensesProps {
   onInventoryPurchase: (
     purchase: PurchaseRequest,
     inventoryDetails: { itemId: string; quantity: number; unitPrice: number },
-    financialDetails: { accountId?: string; supplierId?: string; amount: number; isCredit: boolean }
+    financialDetails: { accountId?: string; supplierId?: string; expenseAccountId?: string; amount: number; isCredit: boolean }
   ) => void;
 }
 
@@ -89,6 +89,9 @@ const Expenses: React.FC<ExpensesProps> = ({
     };
 
     if (formData.isInventoryPurchase) {
+      // Find the expense account based on category
+      const expenseAccount = accounts.find(a => a.name === formData.category) || accounts.find(a => a.type === AccountType.EXPENSE);
+
       // Use the atomic batch handler
       onInventoryPurchase(
         newPurchase,
@@ -100,6 +103,7 @@ const Expenses: React.FC<ExpensesProps> = ({
         {
           accountId: formData.paymentAccountId,
           supplierId: formData.supplierId,
+          expenseAccountId: expenseAccount?.id,
           amount: amount,
           isCredit: formData.isCredit
         }

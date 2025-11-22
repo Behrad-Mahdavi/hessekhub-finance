@@ -81,7 +81,7 @@ export const updateInventoryItem = async (id: string, data: any) => {
 export const saveInventoryPurchase = async (
     purchase: any,
     inventoryDetails: { itemId: string; quantity: number; unitPrice: number },
-    financialDetails: { accountId?: string; supplierId?: string; amount: number; isCredit: boolean }
+    financialDetails: { accountId?: string; supplierId?: string; expenseAccountId?: string; amount: number; isCredit: boolean }
 ) => {
     const batch = writeBatch(db);
 
@@ -111,10 +111,19 @@ export const saveInventoryPurchase = async (
         updatedAt: new Date()
     });
 
-    // 4. Financial Updates (Account or Supplier)
+    // 4. Financial Updates
+
+    // A. Debit Expense Account (Increase Expense)
+    if (financialDetails.expenseAccountId) {
+        const expenseAccountRef = doc(db, 'accounts', financialDetails.expenseAccountId);
+        batch.update(expenseAccountRef, {
+            balance: increment(financialDetails.amount)
+        });
+    }
+
+    // B. Credit Asset or Liability
     if (financialDetails.isCredit && financialDetails.supplierId) {
         // Credit Purchase: Increase Supplier Debt (Balance)
-        // Note: Supplier balance is positive for Debt (We owe them)
         const supplierRef = doc(db, 'suppliers', financialDetails.supplierId);
         batch.update(supplierRef, {
             balance: increment(financialDetails.amount)
