@@ -530,6 +530,13 @@ const App: React.FC = () => {
         // 3. Create Journal Entry
         const salaryExpenseAccount = accounts.find(a => a.code === '5050'); // Salary Expense
 
+        if (salaryExpenseAccount) {
+          // Update Salary Expense Account Balance (Debit = Increase Expense)
+          await firestoreUpdateAccount(salaryExpenseAccount.id, {
+            balance: salaryExpenseAccount.balance + payment.totalAmount
+          });
+        }
+
         const newJournal: JournalEntry = {
           id: `JRN-${Math.floor(Math.random() * 100000)}`,
           date: payment.date,
@@ -562,6 +569,43 @@ const App: React.FC = () => {
     } else {
       // Local fallback (simplified)
       setPayrollPayments(prev => [payment, ...prev]);
+
+      // Update Accounts Locally
+      setAccounts(prev => prev.map(acc => {
+        // Credit Payment Account (Asset)
+        if (acc.id === payment.paymentAccountId) {
+          return { ...acc, balance: acc.balance - payment.totalAmount };
+        }
+        // Debit Salary Expense Account (Expense)
+        if (acc.code === '5050') {
+          return { ...acc, balance: acc.balance + payment.totalAmount };
+        }
+        return acc;
+      }));
+
+      // Add Journal Entry Locally
+      const salaryExpenseAccount = accounts.find(a => a.code === '5050');
+      const newJournal: JournalEntry = {
+        id: `JRN-${Math.floor(Math.random() * 100000)}`,
+        date: payment.date,
+        description: `پرداخت حقوق: ${payment.employeeName} - ${payment.notes || ''}`,
+        lines: [
+          {
+            accountId: salaryExpenseAccount?.id || '',
+            accountName: salaryExpenseAccount?.name || 'هزینه حقوق',
+            debit: payment.totalAmount,
+            credit: 0
+          },
+          {
+            accountId: payment.paymentAccountId,
+            accountName: payment.paymentAccountName,
+            debit: 0,
+            credit: payment.totalAmount
+          }
+        ]
+      };
+      setJournals(prev => [...prev, newJournal]);
+
       toast.success('پرداخت حقوق ثبت شد (محلی)');
     }
   };
