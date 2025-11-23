@@ -237,7 +237,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
 
             {activeTab === 'CUSTOMERS' && (
                 <div className="space-y-4">
-                    <div className="flex gap-4 mb-4">
+                    <div className="flex flex-col md:flex-row gap-4 mb-4">
                         <div className="relative flex-1">
                             <Search className="absolute right-3 top-3 w-5 h-5 text-slate-400" />
                             <input
@@ -250,74 +250,75 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
                         </div>
                         <button
                             onClick={() => setShowAddCustomerModal(true)}
-                            className="bg-indigo-600 text-white px-4 py-2 rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-700 transition-colors"
+                            className="bg-indigo-600 text-white px-4 py-2 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-indigo-700 transition-colors"
                         >
                             <Plus className="w-5 h-5" /> مشتری جدید
                         </button>
                     </div>
 
                     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-                        <table className="w-full text-right">
-                            <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-bold">
-                                <tr>
-                                    <th className="p-4">نام مشتری</th>
-                                    <th className="p-4">شماره تماس</th>
-                                    <th className="p-4">وضعیت حساب</th>
-                                    <th className="p-4">اشتراک فعال</th>
-                                    <th className="p-4">عملیات</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {customers.filter(c => c.name.includes(searchTerm) || c.phoneNumber.includes(searchTerm)).map(customer => {
-                                    const activeSub = subscriptions.find(s => s.customerId === customer.id && s.status === 'ACTIVE');
-                                    return (
-                                        <tr key={customer.id} className="hover:bg-slate-50 transition-colors">
-                                            <td className="p-4 font-bold text-slate-800">{customer.name}</td>
-                                            <td className="p-4 text-slate-600">{customer.phoneNumber}</td>
-                                            <td className={`p-4 font-bold ${customer.balance < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                                                {formatPrice(customer.balance)}
-                                            </td>
-                                            <td className="p-4">
-                                                {activeSub ? (
-                                                    <span className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded text-xs font-bold">
-                                                        {activeSub.planName} ({activeSub.remainingDays} روز)
-                                                    </span>
-                                                ) : (
-                                                    <span className="text-slate-400 text-xs">ندارد</span>
-                                                )}
-                                            </td>
-                                            <td className="p-4">
-                                                <div className="flex items-center gap-3">
-                                                    <button
-                                                        onClick={() => setSelectedCustomer(customer)}
-                                                        className="text-indigo-600 hover:text-indigo-800 text-sm font-bold"
-                                                    >
-                                                        مشاهده پروفایل
-                                                    </button>
-                                                    <button
-                                                        onClick={() => onDeleteCustomer(customer.id)}
-                                                        className="text-slate-400 hover:text-rose-500 transition-colors"
-                                                        title="حذف مشتری"
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-right min-w-[800px]">
+                                <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-bold">
+                                    <tr>
+                                        <th className="p-4">نام مشتری</th>
+                                        <th className="p-4">شماره تماس</th>
+                                        <th className="p-4">وضعیت حساب</th>
+                                        <th className="p-4">اشتراک فعال</th>
+                                        <th className="p-4">عملیات</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {customers.filter(c => c.name.includes(searchTerm) || c.phoneNumber.includes(searchTerm)).map(customer => {
+                                        const activeSub = subscriptions.find(s => s.customerId === customer.id && s.status === 'ACTIVE');
+                                        return (
+                                            <tr key={customer.id} className="hover:bg-slate-50 transition-colors">
+                                                <td className="p-4 font-bold text-slate-800">{customer.name}</td>
+                                                <td className="p-4 text-slate-600">{customer.phoneNumber}</td>
+                                                <td className={`p-4 font-bold ${customer.balance < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                                    {formatPrice(customer.balance)}
+                                                </td>
+                                                <td className="p-4">
+                                                    {activeSub ? (
+                                                        <span className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded text-xs font-bold">
+                                                            {activeSub.planName} ({activeSub.remainingDays} روز)
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-slate-400 text-xs">ندارد</span>
+                                                    )}
+                                                </td>
+                                                <td className="p-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <button
+                                                            onClick={() => setSelectedCustomer(customer)}
+                                                            className="text-indigo-600 hover:text-indigo-800 text-sm font-bold"
+                                                        >
+                                                            مشاهده پروفایل
+                                                        </button>
+                                                        <button
+                                                            onClick={() => onDeleteCustomer(customer.id)}
+                                                            className="text-slate-400 hover:text-rose-500 transition-colors"
+                                                            title="حذف مشتری"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
-            )
-            }
+            )}
 
             {/* Add Customer Modal */}
             {
                 showAddCustomerModal && (
-                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                        <div className="bg-white rounded-2xl w-full max-w-md p-6">
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+                        <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl animate-scale-in">
                             <h3 className="text-xl font-bold mb-4">افزودن مشتری جدید</h3>
                             <form onSubmit={handleCreateCustomer} className="space-y-4">
                                 <div>
@@ -327,7 +328,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
                                         type="text"
                                         value={newCustomerName}
                                         onChange={(e) => setNewCustomerName(e.target.value)}
-                                        className="w-full p-2 border border-slate-300 rounded-lg"
+                                        className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
                                     />
                                 </div>
                                 <div>
@@ -337,20 +338,20 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
                                         type="tel"
                                         value={newCustomerPhone}
                                         onChange={(e) => setNewCustomerPhone(e.target.value)}
-                                        className="w-full p-2 border border-slate-300 rounded-lg dir-ltr text-left"
+                                        className="w-full p-2 border border-slate-300 rounded-lg dir-ltr text-left focus:ring-2 focus:ring-indigo-500 outline-none"
                                     />
                                 </div>
                                 <div className="flex gap-3 mt-6">
                                     <button
                                         type="button"
                                         onClick={() => setShowAddCustomerModal(false)}
-                                        className="flex-1 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded-lg"
+                                        className="flex-1 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded-lg transition-colors"
                                     >
                                         انصراف
                                     </button>
                                     <button
                                         type="submit"
-                                        className="flex-1 py-2 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700"
+                                        className="flex-1 py-2 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition-colors"
                                     >
                                         افزودن
                                     </button>
@@ -364,8 +365,8 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
             {/* Customer Profile Modal */}
             {
                 selectedCustomer && !showRenewModal && (
-                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                        <div className="bg-white rounded-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+                        <div className="bg-white rounded-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto shadow-2xl animate-scale-in">
                             <div className="flex justify-between items-start mb-6">
                                 <div>
                                     <h3 className="text-2xl font-bold text-slate-800">{selectedCustomer.name}</h3>
@@ -406,7 +407,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
                             <div className="mb-6">
                                 <button
                                     onClick={() => setShowRenewModal(true)}
-                                    className="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
+                                    className="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-indigo-200"
                                 >
                                     <RefreshCw className="w-5 h-5" /> تمدید اشتراک / خرید پکیج
                                 </button>
@@ -439,8 +440,8 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
             {/* Renew Modal */}
             {
                 showRenewModal && selectedCustomer && (
-                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                        <div className="bg-white rounded-2xl w-full max-w-md p-6">
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+                        <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl animate-scale-in">
                             <h3 className="text-xl font-bold mb-4">تمدید اشتراک برای {selectedCustomer.name}</h3>
                             <form onSubmit={handleRenew} className="space-y-4">
 
@@ -459,7 +460,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
                                 </div>
 
                                 {isManualDate ? (
-                                    <div className="grid grid-cols-2 gap-4 animate-fade-in-down">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in-down">
                                         <div>
                                             <PersianDatePicker
                                                 label="تاریخ شروع"
@@ -477,7 +478,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
                                                 minDate={manualStartDate}
                                             />
                                         </div>
-                                        <div className="col-span-2 text-xs text-indigo-600 text-center font-bold">
+                                        <div className="col-span-1 md:col-span-2 text-xs text-indigo-600 text-center font-bold">
                                             {manualStartDate && manualEndDate && (
                                                 <span>تعداد روزهای ارسال: {calculateDeliveryDays(manualStartDate, manualEndDate)} روز</span>
                                             )}
@@ -502,15 +503,19 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
                                 )}
 
                                 <div>
-                                    <label className="block text-sm font-bold text-slate-700 mb-1">مبلغ پکیج</label>
+                                    <label className="block text-sm font-bold text-slate-700 mb-2">مبلغ پکیج (تومان)</label>
                                     <input
                                         required
                                         type="number"
                                         value={renewPrice}
                                         onChange={(e) => setRenewPrice(e.target.value)}
-                                        className="w-full p-2 border border-slate-300 rounded-lg"
+                                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all dir-ltr text-left"
                                         placeholder="0"
+                                        style={{ direction: 'ltr', textAlign: 'left' }}
                                     />
+                                    <p className="text-xs text-indigo-600 mt-1 font-bold">
+                                        {renewPrice ? formatPrice(parseFloat(renewPrice)) : '۰ تومان'}
+                                    </p>
                                 </div>
 
                                 <div className="flex items-center gap-2 my-2">

@@ -85,6 +85,7 @@ const Payroll: React.FC<PayrollProps> = ({ employees, accounts, payrollPayments,
                   <div className="md:col-span-3 flex justify-end gap-2 mt-2">
                      <button type="button" onClick={() => setIsAdding(false)} className="px-4 py-2 text-slate-500">انصراف</button>
                      <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold">ذخیره</button>
+                     
                   </div>
                </form>
             </div>

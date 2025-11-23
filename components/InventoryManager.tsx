@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { InventoryItem, InventoryTransaction } from '../types';
-import { Plus, Search, Package, Edit2, History, ArrowDown, AlertTriangle, Save, X } from 'lucide-react';
+import { InventoryItem, InventoryTransaction, PurchaseRequest } from '../types';
+import { Plus, Search, Package, Edit2, History, ArrowDown, AlertTriangle, Save, X, TrendingUp } from 'lucide-react';
 import { toPersianDate, formatPrice } from '../utils';
 import { getInventoryTransactions } from '../services/firestore';
 import InventoryAnalytics from './InventoryAnalytics';
+import PriceHistoryModal from './PriceHistoryModal';
 
 interface InventoryManagerProps {
     inventoryItems: InventoryItem[];
+    purchases: PurchaseRequest[];
     onAddItem: (item: Omit<InventoryItem, 'id' | 'updatedAt'>) => void;
     onUpdateItem: (id: string, data: Partial<InventoryItem>) => void;
     onRegisterUsage: (itemId: string, quantity: number, description: string, date: string) => void;
@@ -14,6 +16,7 @@ interface InventoryManagerProps {
 
 const InventoryManager: React.FC<InventoryManagerProps> = ({
     inventoryItems,
+    purchases,
     onAddItem,
     onUpdateItem,
     onRegisterUsage
@@ -22,6 +25,7 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({
     const [showAddModal, setShowAddModal] = useState(false);
     const [showUsageModal, setShowUsageModal] = useState(false);
     const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
+    const [selectedItemForHistory, setSelectedItemForHistory] = useState<InventoryItem | null>(null);
     const [activeTab, setActiveTab] = useState<'list' | 'analysis'>('list');
     const [transactions, setTransactions] = useState<InventoryTransaction[]>([]);
     const [isLoadingTransactions, setIsLoadingTransactions] = useState(false);
@@ -203,9 +207,18 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({
                                             <p className="text-xs text-slate-500">واحد: {item.unit}</p>
                                         </div>
                                     </div>
-                                    <button onClick={() => openEditModal(item)} className="text-slate-400 hover:text-indigo-600 transition-colors">
-                                        <Edit2 className="w-5 h-5" />
-                                    </button>
+                                    <div className="flex gap-1">
+                                        <button
+                                            onClick={() => setSelectedItemForHistory(item)}
+                                            className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                                            title="تاریخچه قیمت"
+                                        >
+                                            <TrendingUp className="w-5 h-5" />
+                                        </button>
+                                        <button onClick={() => openEditModal(item)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors">
+                                            <Edit2 className="w-5 h-5" />
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4 mb-4">
@@ -238,6 +251,15 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({
                 <InventoryAnalytics
                     inventoryItems={inventoryItems}
                     transactions={transactions}
+                />
+            )}
+
+            {/* Price History Modal */}
+            {selectedItemForHistory && (
+                <PriceHistoryModal
+                    item={selectedItemForHistory}
+                    purchases={purchases}
+                    onClose={() => setSelectedItemForHistory(null)}
                 />
             )}
 

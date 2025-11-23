@@ -66,12 +66,12 @@ const EmployeeProfileModal: React.FC<EmployeeProfileModalProps> = ({
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="bg-white rounded-2xl shadow-2xl w-[95%] md:max-w-4xl max-h-[90vh] overflow-hidden flex flex-col animate-scale-in">
                 {/* Header */}
                 <div className="p-6 border-b border-slate-200 bg-gradient-to-r from-indigo-50 to-purple-50">
                     <div className="flex justify-between items-start">
                         <div className="flex items-center gap-4">
-                            <div className="w-16 h-16 bg-indigo-600 text-white rounded-full flex items-center justify-center font-bold text-2xl">
+                            <div className="w-16 h-16 bg-indigo-600 text-white rounded-full flex items-center justify-center font-bold text-2xl shadow-lg shadow-indigo-200">
                                 {employee.fullName.charAt(0)}
                             </div>
                             <div>
@@ -193,32 +193,34 @@ const EmployeeProfileModal: React.FC<EmployeeProfileModalProps> = ({
                             </div>
                         ) : (
                             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-                                <table className="w-full">
-                                    <thead className="bg-slate-50 border-b border-slate-200">
-                                        <tr>
-                                            <th className="p-3 text-right text-xs font-bold text-slate-600">تاریخ</th>
-                                            <th className="p-3 text-right text-xs font-bold text-slate-600">ساعت کار</th>
-                                            <th className="p-3 text-right text-xs font-bold text-slate-600">مبلغ</th>
-                                            <th className="p-3 text-right text-xs font-bold text-slate-600">حساب پرداخت</th>
-                                            <th className="p-3 text-right text-xs font-bold text-slate-600">یادداشت</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {employeePayments
-                                            .sort((a, b) => b.date.localeCompare(a.date))
-                                            .map(payment => (
-                                                <tr key={payment.id} className="hover:bg-slate-50 transition-colors">
-                                                    <td className="p-3 text-sm text-slate-700">{payment.date}</td>
-                                                    <td className="p-3 text-sm text-slate-700 dir-ltr">{payment.hoursWorked}</td>
-                                                    <td className="p-3 text-sm font-bold text-emerald-600 dir-ltr">
-                                                        {payment.totalAmount.toLocaleString()} تومان
-                                                    </td>
-                                                    <td className="p-3 text-sm text-slate-600">{payment.paymentAccountName}</td>
-                                                    <td className="p-3 text-sm text-slate-500">{payment.notes || '-'}</td>
-                                                </tr>
-                                            ))}
-                                    </tbody>
-                                </table>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full min-w-[600px]">
+                                        <thead className="bg-slate-50 border-b border-slate-200">
+                                            <tr>
+                                                <th className="p-3 text-right text-xs font-bold text-slate-600">تاریخ</th>
+                                                <th className="p-3 text-right text-xs font-bold text-slate-600">ساعت کار</th>
+                                                <th className="p-3 text-right text-xs font-bold text-slate-600">مبلغ</th>
+                                                <th className="p-3 text-right text-xs font-bold text-slate-600">حساب پرداخت</th>
+                                                <th className="p-3 text-right text-xs font-bold text-slate-600">یادداشت</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {employeePayments
+                                                .sort((a, b) => b.date.localeCompare(a.date))
+                                                .map(payment => (
+                                                    <tr key={payment.id} className="hover:bg-slate-50 transition-colors">
+                                                        <td className="p-3 text-sm text-slate-700">{payment.date}</td>
+                                                        <td className="p-3 text-sm text-slate-700 dir-ltr">{payment.hoursWorked}</td>
+                                                        <td className="p-3 text-sm font-bold text-emerald-600 dir-ltr">
+                                                            {payment.totalAmount.toLocaleString()} تومان
+                                                        </td>
+                                                        <td className="p-3 text-sm text-slate-600">{payment.paymentAccountName}</td>
+                                                        <td className="p-3 text-sm text-slate-500">{payment.notes || '-'}</td>
+                                                    </tr>
+                                                ))}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         )}
                     </div>

@@ -673,7 +673,7 @@ const Expenses: React.FC<ExpensesProps> = ({
                   <div className="flex items-center gap-2 bg-amber-50 p-3 rounded-xl border border-amber-100 text-amber-800">
                     <Scale className="w-4 h-4" />
                     <span className="text-sm font-medium">
-                      مقدار مصرفی: <span className="font-bold">{selectedPurchase.quantity} {selectedPurchase.unit}</span>
+                      مقدار: <span className="font-bold">{selectedPurchase.quantity} {selectedPurchase.unit}</span>
                     </span>
                   </div>
                 )}

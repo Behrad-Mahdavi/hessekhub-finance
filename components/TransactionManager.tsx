@@ -224,27 +224,27 @@ const TransactionManager: React.FC = () => {
 
     return (
         <div className="p-6 animate-fade-in-up">
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
                 <div>
                     <h1 className="text-2xl font-black text-slate-800 mb-2">مدیریت تراکنش‌ها</h1>
                     <p className="text-slate-500 text-sm">مشاهده، ویرایش و حذف تراکنش‌ها با قابلیت بازگشت کامل</p>
                 </div>
-                <div className="flex gap-2">
-                    <div className="relative">
+                <div className="flex gap-2 w-full md:w-auto">
+                    <div className="relative w-full md:w-auto">
                         <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                         <input
                             type="text"
                             placeholder="جستجو..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-4 pr-10 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-500 w-64"
+                            className="pl-4 pr-10 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-500 w-full md:w-64"
                         />
                     </div>
                 </div>
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+            <div className="flex gap-2 mb-6 overflow-x-auto pb-2 no-scrollbar">
                 {[
                     { id: 'ALL', label: 'همه' },
                     { id: 'SALES', label: 'فروش‌ها' },
@@ -267,74 +267,76 @@ const TransactionManager: React.FC = () => {
 
             {/* Table */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <table className="w-full">
-                    <thead className="bg-slate-50 border-b border-slate-100">
-                        <tr>
-                            <th className="p-4 text-right text-xs font-bold text-slate-500 uppercase">تاریخ</th>
-                            <th className="p-4 text-right text-xs font-bold text-slate-500 uppercase">نوع</th>
-                            <th className="p-4 text-right text-xs font-bold text-slate-500 uppercase">شرح</th>
-                            <th className="p-4 text-right text-xs font-bold text-slate-500 uppercase">مبلغ</th>
-                            <th className="p-4 text-center text-xs font-bold text-slate-500 uppercase">عملیات</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                        {filteredTransactions.map((t: any) => {
-                            const typeStyle = getTypeLabel(t.type);
-                            return (
-                                <tr key={t.id} className="hover:bg-slate-50 transition-colors group">
-                                    <td className="p-4 text-sm font-medium text-slate-600">
-                                        {toPersianDigits(t.displayDate || '')}
-                                    </td>
-                                    <td className="p-4">
-                                        <span className={`px-2 py-1 rounded-md text-xs font-bold ${typeStyle.color}`}>
-                                            {typeStyle.text}
-                                        </span>
-                                    </td>
-                                    <td className="p-4 text-sm text-slate-700">
-                                        {(t.description || t.details || t.employeeName || '-')}
-                                        {t.type === 'INVENTORY' && t.itemName && <span className="text-xs text-slate-500 block mt-1">کالا: {t.itemName}</span>}
-                                        {t.customerName && <span className="text-xs text-slate-400 block mt-1">{t.customerName}</span>}
-                                    </td>
-                                    <td className="p-4 text-sm font-bold text-slate-800">
-                                        {t.type === 'INVENTORY' ? (
-                                            <span dir="ltr" className="flex items-center justify-end gap-1">
-                                                {Math.abs(t.quantity)} {t.unit}
-                                                {t.quantity > 0 ? <ArrowUpCircle className="w-4 h-4 text-green-500" /> : <ArrowDownCircle className="w-4 h-4 text-amber-500" />}
+                <div className="overflow-x-auto">
+                    <table className="w-full min-w-[800px]">
+                        <thead className="bg-slate-50 border-b border-slate-100">
+                            <tr>
+                                <th className="p-4 text-right text-xs font-bold text-slate-500 uppercase">تاریخ</th>
+                                <th className="p-4 text-right text-xs font-bold text-slate-500 uppercase">نوع</th>
+                                <th className="p-4 text-right text-xs font-bold text-slate-500 uppercase">شرح</th>
+                                <th className="p-4 text-right text-xs font-bold text-slate-500 uppercase">مبلغ</th>
+                                <th className="p-4 text-center text-xs font-bold text-slate-500 uppercase">عملیات</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {filteredTransactions.map((t: any) => {
+                                const typeStyle = getTypeLabel(t.type);
+                                return (
+                                    <tr key={t.id} className="hover:bg-slate-50 transition-colors group">
+                                        <td className="p-4 text-sm font-medium text-slate-600">
+                                            {toPersianDigits(t.displayDate || '')}
+                                        </td>
+                                        <td className="p-4">
+                                            <span className={`px-2 py-1 rounded-md text-xs font-bold ${typeStyle.color}`}>
+                                                {typeStyle.text}
                                             </span>
-                                        ) : (
-                                            t.amount !== undefined && t.amount !== null ? (t.amount === 0 ? '۰ تومان' : formatPrice(t.amount)) : '-'
-                                        )}
-                                    </td>
-                                    <td className="p-4">
-                                        <div className="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button
-                                                onClick={() => handleEditClick(t)}
-                                                className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                                title="ویرایش"
-                                            >
-                                                <Edit2 className="w-4 h-4" />
-                                            </button>
-                                            <button
-                                                onClick={() => handleDelete(t)}
-                                                className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                                title="حذف و بازگشت اثرات"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        </div>
+                                        </td>
+                                        <td className="p-4 text-sm text-slate-700">
+                                            {(t.description || t.details || t.employeeName || '-')}
+                                            {t.type === 'INVENTORY' && t.itemName && <span className="text-xs text-slate-500 block mt-1">کالا: {t.itemName}</span>}
+                                            {t.customerName && <span className="text-xs text-slate-400 block mt-1">{t.customerName}</span>}
+                                        </td>
+                                        <td className="p-4 text-sm font-bold text-slate-800">
+                                            {t.type === 'INVENTORY' ? (
+                                                <span dir="ltr" className="flex items-center justify-end gap-1">
+                                                    {Math.abs(t.quantity)} {t.unit}
+                                                    {t.quantity > 0 ? <ArrowUpCircle className="w-4 h-4 text-green-500" /> : <ArrowDownCircle className="w-4 h-4 text-amber-500" />}
+                                                </span>
+                                            ) : (
+                                                t.amount !== undefined && t.amount !== null ? (t.amount === 0 ? '۰ تومان' : formatPrice(t.amount)) : '-'
+                                            )}
+                                        </td>
+                                        <td className="p-4">
+                                            <div className="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button
+                                                    onClick={() => handleEditClick(t)}
+                                                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                                    title="ویرایش"
+                                                >
+                                                    <Edit2 className="w-4 h-4" />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDelete(t)}
+                                                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                    title="حذف و بازگشت اثرات"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                            {filteredTransactions.length === 0 && (
+                                <tr>
+                                    <td colSpan={5} className="p-8 text-center text-slate-400 text-sm">
+                                        هیچ تراکنشی یافت نشد
                                     </td>
                                 </tr>
-                            );
-                        })}
-                        {filteredTransactions.length === 0 && (
-                            <tr>
-                                <td colSpan={5} className="p-8 text-center text-slate-400 text-sm">
-                                    هیچ تراکنشی یافت نشد
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             {/* Edit Modal */}

@@ -1,16 +1,30 @@
 import React, { useState } from 'react';
-import { Account, AccountType } from '../types';
+import { Account, AccountType, SaleRecord, PurchaseRequest, PayrollPayment, JournalEntry } from '../types';
 import { formatPrice } from '../utils';
-import { CreditCard, Plus, Trash2, Save, Edit2, Wallet } from 'lucide-react';
+import { CreditCard, Plus, Trash2, Save, Edit2, Wallet, Eye } from 'lucide-react';
+import AccountProfileModal from './AccountProfileModal';
 
 interface SettingsProps {
   accounts: Account[];
+  sales: SaleRecord[];
+  purchases: PurchaseRequest[];
+  payrollPayments: PayrollPayment[];
+  journals: JournalEntry[];
   onAddAccount: (name: string, type: AccountType, initialBalance: number) => void;
   onUpdateAccount: (id: string, name: string, balance: number) => void;
   onDeleteAccount: (id: string) => void;
 }
 
-const Settings: React.FC<SettingsProps> = ({ accounts, onAddAccount, onUpdateAccount, onDeleteAccount }) => {
+const Settings: React.FC<SettingsProps> = ({
+  accounts,
+  sales,
+  purchases,
+  payrollPayments,
+  journals,
+  onAddAccount,
+  onUpdateAccount,
+  onDeleteAccount
+}) => {
   // Filter for Asset accounts (Cash/Bank)
   const assetAccounts = accounts.filter(a => a.type === AccountType.ASSET);
 
@@ -20,6 +34,9 @@ const Settings: React.FC<SettingsProps> = ({ accounts, onAddAccount, onUpdateAcc
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editBalance, setEditBalance] = useState('');
+
+  // Account Profile State
+  const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
 
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
@@ -110,7 +127,7 @@ const Settings: React.FC<SettingsProps> = ({ accounts, onAddAccount, onUpdateAcc
             </thead>
             <tbody className="divide-y divide-slate-100">
               {assetAccounts.map(acc => (
-                <tr key={acc.id} className="hover:bg-slate-50/80">
+                <tr key={acc.id} className="hover:bg-slate-50/80 group">
                   <td className="p-4 text-sm font-mono text-slate-400">{acc.code}</td>
 
                   <td className="p-4">
@@ -122,8 +139,11 @@ const Settings: React.FC<SettingsProps> = ({ accounts, onAddAccount, onUpdateAcc
                         className="w-full p-1 border border-slate-300 rounded"
                       />
                     ) : (
-                      <div className="flex items-center gap-2 font-bold text-slate-700">
-                        <CreditCard className="w-4 h-4 text-slate-400" />
+                      <div
+                        onClick={() => setSelectedAccount(acc)}
+                        className="flex items-center gap-2 font-bold text-slate-700 cursor-pointer hover:text-indigo-600 transition-colors"
+                      >
+                        <CreditCard className="w-4 h-4 text-slate-400 group-hover:text-indigo-500" />
                         {acc.name}
                       </div>
                     )}
@@ -154,6 +174,13 @@ const Settings: React.FC<SettingsProps> = ({ accounts, onAddAccount, onUpdateAcc
                         </>
                       ) : (
                         <>
+                          <button
+                            onClick={() => setSelectedAccount(acc)}
+                            className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"
+                            title="مشاهده تراکنش‌ها"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
                           <button onClick={() => startEdit(acc)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"><Edit2 className="w-4 h-4" /></button>
                           {/* Prevent deleting core accounts if needed, but for now allowing it */}
                           <button onClick={() => onDeleteAccount(acc.id)} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg"><Trash2 className="w-4 h-4" /></button>
@@ -167,6 +194,18 @@ const Settings: React.FC<SettingsProps> = ({ accounts, onAddAccount, onUpdateAcc
           </table>
         </div>
       </div>
+
+      {/* Account Profile Modal */}
+      {selectedAccount && (
+        <AccountProfileModal
+          account={selectedAccount}
+          sales={sales}
+          purchases={purchases}
+          payrollPayments={payrollPayments}
+          journals={journals}
+          onClose={() => setSelectedAccount(null)}
+        />
+      )}
     </div>
   );
 };

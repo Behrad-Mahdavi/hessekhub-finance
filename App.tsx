@@ -96,6 +96,14 @@ const App: React.FC = () => {
   const [connectionStatus, setConnectionStatus] = useState<'checking' | 'connected' | 'error'>('checking');
   const [connectionError, setConnectionError] = useState<string>('');
 
+  // Debug: Log payroll payments when they change
+  useEffect(() => {
+    console.log('Payroll Payments Updated:', {
+      count: payrollPayments.length,
+      data: payrollPayments
+    });
+  }, [payrollPayments]);
+
   // Inventory Management Logic
   const handleAddInventoryItem = async (item: Omit<InventoryItem, 'id' | 'updatedAt'>) => {
     try {
@@ -1229,6 +1237,7 @@ const App: React.FC = () => {
             sales={sales}
             purchases={purchases}
             subscriptions={subscriptions}
+            payrollPayments={payrollPayments}
             onViewSubscriptions={() => setCurrentView('subscriptions')}
           />
         );
@@ -1264,6 +1273,10 @@ const App: React.FC = () => {
         return (
           <Settings
             accounts={accounts}
+            sales={sales}
+            purchases={purchases}
+            payrollPayments={payrollPayments}
+            journals={journals}
             onAddAccount={handleAddAccount}
             onUpdateAccount={handleUpdateAccount}
             onDeleteAccount={handleDeleteAccount}
@@ -1309,12 +1322,10 @@ const App: React.FC = () => {
         return (
           <InventoryManager
             inventoryItems={inventoryItems}
+            purchases={purchases}
             onAddItem={handleAddInventoryItem}
             onUpdateItem={handleUpdateInventoryItem}
             onRegisterUsage={handleRegisterUsage}
-            onPurchase={handleInventoryPurchase}
-            accounts={accounts}
-            suppliers={suppliers}
           />
         );
       case 'transactions': // Added new case

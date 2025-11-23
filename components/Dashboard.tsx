@@ -17,6 +17,12 @@ interface DashboardProps {
 const Dashboard: React.FC<DashboardProps> = ({ accounts, sales, purchases, subscriptions, payrollPayments, onViewSubscriptions }) => {
   const [daysRange, setDaysRange] = useState<number>(7);
 
+  // Debug: Log what props Dashboard receives
+  console.log('Dashboard Props Received:', {
+    payrollPaymentsCount: (payrollPayments || []).length,
+    payrollPayments: payrollPayments
+  });
+
 
   // 1. Calculate General Accounting KPIs
   // Revenue = All Sales (Cafe + Subscriptions)
@@ -26,8 +32,25 @@ const Dashboard: React.FC<DashboardProps> = ({ accounts, sales, purchases, subsc
   const totalPurchases = (purchases || [])
     .filter(p => p.status === TransactionStatus.APPROVED)
     .reduce((acc, purchase) => acc + purchase.amount, 0);
-  const totalPayroll = (payrollPayments || []).reduce((acc, payment) => acc + payment.totalAmount, 0);
+
+  // Only sum payroll records that have a valid totalAmount
+  const totalPayroll = (payrollPayments || [])
+    .filter(payment => payment.totalAmount !== undefined && payment.totalAmount !== null)
+    .reduce((acc, payment) => acc + payment.totalAmount, 0);
+
   const totalExpenses = totalPurchases + totalPayroll;
+
+  // Debug logging
+  console.log('Dashboard Calculations:', {
+    salesCount: (sales || []).length,
+    totalRevenue,
+    purchasesCount: (purchases || []).length,
+    totalPurchases,
+    payrollCount: (payrollPayments || []).length,
+    totalPayroll,
+    totalExpenses,
+    netProfit: totalRevenue - totalExpenses
+  });
 
   const netProfit = totalRevenue - totalExpenses;
   const cashOnHand = accounts.filter(a => a.type === AccountType.ASSET).reduce((acc, curr) => acc + curr.balance, 0); // Total Cash + Bank
@@ -36,18 +59,17 @@ const Dashboard: React.FC<DashboardProps> = ({ accounts, sales, purchases, subsc
   // 2. Calculate Specific Business KPIs (Brief Requirements)
 
   // MRR (Monthly Recurring Revenue)
-  // Calculated from active subscriptions
+  // Only count subscriptions that are exactly 30 days (monthly recurring)
+  // Short-term packages (6 days, 10 days, etc.) are one-time payments, not recurring
   const activeSubs = subscriptions.filter(s => s.status === 'ACTIVE');
 
   const mrr = activeSubs.reduce((total, sub) => {
-    // Calculate monthly value
-    // If plan is "1 Month" or similar, it's the price.
-    // If it's "2 Weeks", we multiply by 2 (approx).
-    // Better: (Price / Total Days) * 30
-    if (sub.totalDeliveryDays > 0) {
-      return total + ((sub.price / sub.totalDeliveryDays) * 30); // Normalized to 30 days
+    // Only include subscriptions that are monthly (30 days)
+    // Anything shorter is a one-time package, not recurring revenue
+    if (sub.totalDeliveryDays === 30) {
+      return total + sub.price;
     }
-    return total + sub.price; // Fallback
+    return total; // Don't count short-term packages in MRR
   }, 0);
 
   // Daily Cafe Revenue
@@ -77,10 +99,18 @@ const Dashboard: React.FC<DashboardProps> = ({ accounts, sales, purchases, subsc
         .filter(s => s.date === dateStr)
         .reduce((acc, curr) => acc + curr.amount, 0);
 
-      // Sum APPROVED Expenses for this date
-      const dailyExpenses = purchases
+      // Sum APPROVED Purchases for this date
+      const dailyPurchases = purchases
         .filter(p => p.date === dateStr && p.status === TransactionStatus.APPROVED)
         .reduce((acc, curr) => acc + curr.amount, 0);
+
+      // Sum Payroll for this date
+      const dailyPayroll = (payrollPayments || [])
+        .filter(p => p.date === dateStr && p.totalAmount !== undefined && p.totalAmount !== null)
+        .reduce((acc, curr) => acc + curr.totalAmount, 0);
+
+      // Total Daily Expenses = Purchases + Payroll
+      const dailyExpenses = dailyPurchases + dailyPayroll;
 
       data.push({
         day: dayName,
