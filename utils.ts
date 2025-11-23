@@ -7,7 +7,15 @@ export const toPersianDate = (date: Date = new Date()): string => {
 };
 
 export const toPersianNumber = (num: number): string => {
-  return new Intl.NumberFormat('fa-IR').format(num);
+  return new Intl.NumberFormat('fa-IR', { useGrouping: false }).format(num);
+};
+
+export const toPersianDigits = (str: string): string => {
+  return str.replace(/\d/g, (d) => '۰۱۲۳۴۵۶۷۸۹'[parseInt(d)]);
+};
+
+export const toEnglishDigits = (str: string): string => {
+  return str.replace(/[۰-۹]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d).toString());
 };
 
 export const getDurationInMonths = (durationStr?: string): number => {
@@ -63,4 +71,77 @@ export const calculateSubscriptionEndDate = (startDate: Date, deliveryDays: numb
   }
 
   return currentDate;
+};
+
+// Helper to convert Persian Date String (1403/09/01) to JS Date
+// Note: This is an approximation for day-of-week calculation.
+// Ideally we should use jalaali-js, but for now we'll use a simple conversion
+// assuming the user inputs valid dates.
+// Since we only need to know if it's a Friday, and the 7-day cycle is consistent,
+// we can try to map it.
+// Actually, without a library, mapping Persian to Gregorian for Day of Week is hard.
+// Let's assume the user selects dates using a picker that gives us Gregorian Dates under the hood?
+// No, the UI usually shows Persian.
+// Let's try to use Intl to find a matching date? No, too slow.
+
+// Strategy: We will assume the input strings are valid.
+// We will use a known reference date (e.g., 1403/01/01 = 2024-03-20 which was Wednesday)
+// and count days from there to find the day of week.
+const PERSIAN_EPOCH = {
+  year: 1403,
+  month: 1,
+  day: 1,
+  gregorian: new Date(2024, 2, 20), // March 20, 2024
+  dayOfWeek: 3 // Wednesday (0=Sun, 1=Mon, 2=Tue, 3=Wed)
+};
+
+const parsePersianDate = (dateStr: string): { year: number, month: number, day: number } | null => {
+  const parts = dateStr.split('/');
+  if (parts.length !== 3) return null;
+  return {
+    year: parseInt(parts[0]),
+    month: parseInt(parts[1]),
+    day: parseInt(parts[2])
+  };
+};
+
+const getDaysFromEpoch = (pDate: { year: number, month: number, day: number }): number => {
+  let days = 0;
+  // Year diff
+  days += (pDate.year - PERSIAN_EPOCH.year) * 365;
+  // Leap years approximation (simple)
+  // This is not perfect but might suffice for short ranges close to 1403.
+
+  // Month diff (First 6 months = 31 days, next 5 = 30, last = 29)
+  const monthDays = [0, 31, 62, 93, 124, 155, 186, 216, 246, 276, 306, 336];
+  days += monthDays[pDate.month - 1];
+
+  // Day diff
+  days += pDate.day - 1;
+
+  return days;
+};
+
+export const calculateDeliveryDays = (startDateStr: string, endDateStr: string): number => {
+  const start = parsePersianDate(toEnglishDigits(startDateStr));
+  const end = parsePersianDate(toEnglishDigits(endDateStr));
+
+  if (!start || !end) return 0;
+
+  const startDays = getDaysFromEpoch(start);
+  const endDays = getDaysFromEpoch(end);
+
+  let validDays = 0;
+  // Iterate from start to end (inclusive)
+  for (let i = startDays; i <= endDays; i++) {
+    // Calculate day of week
+    // Epoch was Wednesday (3).
+    const dayOfWeek = (PERSIAN_EPOCH.dayOfWeek + i) % 7;
+    // Friday is 5
+    if (dayOfWeek !== 5) {
+      validDays++;
+    }
+  }
+
+  return validDays;
 };

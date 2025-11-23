@@ -11,7 +11,8 @@ import {
     writeBatch,
     setDoc,
     limit,
-    increment
+    increment,
+    getDoc
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Account, PurchaseRequest, SaleRecord, JournalEntry, Employee, Customer, Subscription } from '../types';
@@ -311,10 +312,211 @@ export const updateSale = async (id: string, data: Partial<SaleRecord>) => {
     await updateDoc(docRef, cleanData(data));
 };
 
-export const deleteSale = async (id: string) => {
-    const docRef = doc(db, 'sales', id);
-    await deleteDoc(docRef);
+// --- Reversal Logic Helpers ---
+
+const findRelatedJournalEntry = async (referenceId: string) => {
+    // Fetch all journals and find the one with referenceId.
+    // This is not scalable but works for MVP.
+    const snapshot = await getDocs(journalsRef);
+    return snapshot.docs.find(doc => doc.data().referenceId === referenceId);
 };
+
+// --- Advanced Delete Operations (Full Reversal) ---
+
+export const deleteSaleFull = async (saleId: string) => {
+    const batch = writeBatch(db);
+
+    // 1. Fetch Sale
+    const saleRef = doc(db, 'sales', saleId);
+    const saleSnap = await getDoc(saleRef);
+    if (!saleSnap.exists()) throw new Error('Sale not found');
+    const saleData = saleSnap.data() as SaleRecord;
+
+    // 2. Delete Sale Document
+    batch.delete(saleRef);
+
+    // 3. Revert Financials (Journal)
+    const journalDoc = await findRelatedJournalEntry(saleId);
+    if (journalDoc) {
+        const journalData = journalDoc.data() as JournalEntry;
+        // Reverse Journal Effects
+        for (const line of journalData.lines) {
+            const accountRef = doc(db, 'accounts', line.accountId);
+            // Reverse: Debit -> Decrease Balance, Credit -> Decrease Balance (since we added them)
+            // Wait, logic check:
+            // Asset (Debit +): We added to balance. Reversal: Subtract.
+            // Revenue (Credit +): We added to balance. Reversal: Subtract.
+            // So yes, subtract both.
+            if (line.debit > 0) batch.update(accountRef, { balance: increment(-line.debit) });
+            if (line.credit > 0) batch.update(accountRef, { balance: increment(-line.credit) });
+        }
+        batch.delete(journalDoc.ref);
+    }
+
+    // 4. Revert Customer Balance & Subscription
+    if (saleData.customerId) {
+        // If Subscription
+        if (saleData.subscriptionId) {
+            const subRef = doc(db, 'subscriptions', saleData.subscriptionId);
+            const subSnap = await getDoc(subRef);
+
+            if (subSnap.exists()) {
+                const subData = subSnap.data() as Subscription;
+                // If it was a CREDIT subscription, we increased Customer Debt (Balance -Price).
+                // Reversal: Increase Customer Balance (+Price).
+                if (subData.paymentStatus === 'CREDIT') {
+                    const customerRef = doc(db, 'customers', saleData.customerId);
+                    batch.update(customerRef, { balance: increment(subData.price) });
+                }
+                // Delete Subscription
+                batch.delete(subRef);
+            }
+        }
+        // If NOT Subscription but Credit Sale (not implemented in UI yet but good to handle)
+        // If saleData.amount === 0 and it wasn't a subscription, it might be credit?
+        // Current app logic only has Credit for Subscriptions.
+    }
+
+    await batch.commit();
+};
+
+export const deleteExpenseFull = async (expenseId: string) => {
+    const batch = writeBatch(db);
+
+    // 1. Fetch Expense
+    const expenseRef = doc(db, 'purchases', expenseId);
+    const expenseSnap = await getDoc(expenseRef);
+    if (!expenseSnap.exists()) throw new Error('Expense not found');
+    const expenseData = expenseSnap.data() as PurchaseRequest;
+
+    // 2. Delete Expense Document
+    batch.delete(expenseRef);
+
+    // 3. Revert Financials (Journal)
+    const journalDoc = await findRelatedJournalEntry(expenseId);
+    if (journalDoc) {
+        const journalData = journalDoc.data() as JournalEntry;
+        for (const line of journalData.lines) {
+            const accountRef = doc(db, 'accounts', line.accountId);
+            if (line.debit > 0) batch.update(accountRef, { balance: increment(-line.debit) });
+            if (line.credit > 0) batch.update(accountRef, { balance: increment(-line.credit) });
+        }
+        batch.delete(journalDoc.ref);
+    }
+
+    // 4. Revert Supplier Balance (if Credit Purchase)
+    if (expenseData.isCredit && expenseData.supplierId) {
+        const supplierRef = doc(db, 'suppliers', expenseData.supplierId);
+        // We increased balance (Debt). Reversal: Decrease.
+        batch.update(supplierRef, { balance: increment(-expenseData.amount) });
+    }
+
+    // 5. Revert Inventory (if Inventory Purchase)
+    if (expenseData.isInventoryPurchase && expenseData.inventoryDetails) {
+        // We need to find the Inventory Transaction too?
+        // The transaction has relatedExpenseId = expenseId.
+        const q = query(collection(db, 'inventory_transactions')); // Filter client side for now
+        const snapshot = await getDocs(q);
+        const transDoc = snapshot.docs.find(d => d.data().relatedExpenseId === expenseId);
+
+        if (transDoc) {
+            // Revert Stock
+            const itemRef = doc(db, 'inventory_items', expenseData.inventoryDetails.itemId);
+            // Purchase added quantity. Reversal: Subtract.
+            batch.update(itemRef, { currentStock: increment(-expenseData.inventoryDetails.quantity) });
+
+            // Delete Transaction
+            batch.delete(transDoc.ref);
+        }
+    }
+
+    await batch.commit();
+};
+
+export const deletePayrollFull = async (paymentId: string) => {
+    const batch = writeBatch(db);
+
+    // 1. Fetch Payment
+    const paymentRef = doc(db, 'payroll_payments', paymentId);
+    const paymentSnap = await getDoc(paymentRef);
+    if (!paymentSnap.exists()) throw new Error('Payment not found');
+    // const paymentData = paymentSnap.data();
+
+    // 2. Delete Payment Document
+    batch.delete(paymentRef);
+
+    // 3. Revert Financials (Journal)
+    const journalDoc = await findRelatedJournalEntry(paymentId);
+    if (journalDoc) {
+        const journalData = journalDoc.data() as JournalEntry;
+        for (const line of journalData.lines) {
+            const accountRef = doc(db, 'accounts', line.accountId);
+            if (line.debit > 0) batch.update(accountRef, { balance: increment(-line.debit) });
+            if (line.credit > 0) batch.update(accountRef, { balance: increment(-line.credit) });
+        }
+        batch.delete(journalDoc.ref);
+    }
+
+    await batch.commit();
+};
+
+export const deleteInventoryUsageFull = async (transactionId: string) => {
+    const batch = writeBatch(db);
+
+    // 1. Fetch Transaction
+    const transRef = doc(db, 'inventory_transactions', transactionId);
+    const transSnap = await getDoc(transRef);
+    if (!transSnap.exists()) throw new Error('Transaction not found');
+    const transData = transSnap.data();
+
+    // 2. Delete Transaction
+    batch.delete(transRef);
+
+    // 3. Revert Stock
+    // Usage subtracted quantity (stored as negative).
+    // Reversal: Subtract the negative amount (Add it back).
+    // Or just: increment(-quantity). If quantity was -5, -(-5) = +5.
+    const itemRef = doc(db, 'inventory_items', transData.itemId);
+    batch.update(itemRef, { currentStock: increment(-transData.quantity) });
+
+    await batch.commit();
+};
+
+// --- Advanced Edit Operations (Reverse & Re-create) ---
+
+export const editSaleFull = async (saleId: string, newSaleData: SaleRecord) => {
+    // 1. Delete Old (Reverse all effects)
+    await deleteSaleFull(saleId);
+    // 2. Create New
+    return await addSale(newSaleData);
+};
+
+export const editExpenseFull = async (expenseId: string, newExpenseData: PurchaseRequest) => {
+    // 1. Delete Old
+    await deleteExpenseFull(expenseId);
+    // 2. Create New
+    return await addPurchase(newExpenseData);
+};
+
+export const editInventoryPurchaseFull = async (
+    purchaseId: string,
+    newPurchaseData: PurchaseRequest,
+    inventoryDetails: { itemId: string; quantity: number; unitPrice: number },
+    financialDetails: { accountId?: string; supplierId?: string; expenseAccountId?: string; amount: number; isCredit: boolean }
+) => {
+    // 1. Delete Old
+    await deleteExpenseFull(purchaseId); // This handles inventory reversal too if isInventoryPurchase is true
+    // 2. Create New
+    return await saveInventoryPurchase(newPurchaseData, inventoryDetails, financialDetails);
+};
+
+export const editPayrollFull = async (paymentId: string, newPaymentData: any) => {
+    // 1. Delete Old
+    await deletePayrollFull(paymentId);
+    // 2. Create New
+    return await addPayrollPayment(newPaymentData);
+};
+
 
 // Journals
 export const addJournal = async (journal: JournalEntry) => {

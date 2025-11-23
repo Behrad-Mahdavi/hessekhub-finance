@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { TrendingUp, CreditCard, AlertCircle, Repeat, Coffee } from 'lucide-react';
-import { Account, SaleRecord, PurchaseRequest, AccountType, RevenueStream, SubscriptionStatus, TransactionStatus, Subscription } from '../types';
+import { Account, SaleRecord, PurchaseRequest, AccountType, RevenueStream, SubscriptionStatus, TransactionStatus, Subscription, PayrollPayment } from '../types';
 
 import { toPersianDate, getDurationInMonths } from '../utils';
 
@@ -10,19 +10,28 @@ interface DashboardProps {
   sales: SaleRecord[];
   purchases: PurchaseRequest[];
   subscriptions: Subscription[];
+  payrollPayments: PayrollPayment[];
   onViewSubscriptions: () => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ accounts, sales, purchases, subscriptions, onViewSubscriptions }) => {
+const Dashboard: React.FC<DashboardProps> = ({ accounts, sales, purchases, subscriptions, payrollPayments, onViewSubscriptions }) => {
   const [daysRange, setDaysRange] = useState<number>(7);
 
 
   // 1. Calculate General Accounting KPIs
-  const totalRevenue = accounts.filter(a => a.type === AccountType.REVENUE).reduce((acc, curr) => acc + curr.balance, 0);
-  const totalExpenses = accounts.filter(a => a.type === AccountType.EXPENSE).reduce((acc, curr) => acc + curr.balance, 0);
+  // Revenue = All Sales (Cafe + Subscriptions)
+  const totalRevenue = (sales || []).reduce((acc, sale) => acc + sale.amount, 0);
+
+  // Expenses = Purchases + Payroll
+  const totalPurchases = (purchases || [])
+    .filter(p => p.status === TransactionStatus.APPROVED)
+    .reduce((acc, purchase) => acc + purchase.amount, 0);
+  const totalPayroll = (payrollPayments || []).reduce((acc, payment) => acc + payment.totalAmount, 0);
+  const totalExpenses = totalPurchases + totalPayroll;
+
   const netProfit = totalRevenue - totalExpenses;
   const cashOnHand = accounts.filter(a => a.type === AccountType.ASSET).reduce((acc, curr) => acc + curr.balance, 0); // Total Cash + Bank
-  const pendingApprovals = purchases.filter(p => p.status === 'PENDING').length;
+  const pendingApprovals = (purchases || []).filter(p => p.status === 'PENDING').length;
 
   // 2. Calculate Specific Business KPIs (Brief Requirements)
 

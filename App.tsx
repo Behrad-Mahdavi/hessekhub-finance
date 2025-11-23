@@ -10,7 +10,8 @@ import Settings from './components/Settings';
 import Payroll from './components/Payroll';
 import SubscriptionManager from './components/SubscriptionManager';
 import InventoryManager from './components/InventoryManager';
-import { LayoutDashboard, ShoppingCart, PieChart, Book, Settings as SettingsIcon, Shield, Menu, X, Wallet, Users, Lock, LogIn, Truck, Package } from 'lucide-react';
+import TransactionManager from './components/TransactionManager';
+import { LayoutDashboard, ShoppingCart, PieChart, Book, Settings as SettingsIcon, Shield, Menu, X, Wallet, Users, Lock, LogIn, Truck, Package, History } from 'lucide-react';
 
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
@@ -25,7 +26,7 @@ import {
   deletePurchase as firestoreDeletePurchase,
   addSale as firestoreAddSale,
   updateSale as firestoreUpdateSale,
-  deleteSale as firestoreDeleteSale,
+  deleteSaleFull as firestoreDeleteSale,
   addJournal as firestoreAddJournal,
   addEmployee as firestoreAddEmployee,
   deleteEmployee as firestoreDeleteEmployee,
@@ -49,7 +50,7 @@ import {
 } from './services/firestore';
 import SupplierManager from './components/SupplierManager';
 
-type View = 'dashboard' | 'expenses' | 'sales' | 'ledger' | 'settings' | 'payroll' | 'subscriptions' | 'suppliers' | 'inventory';
+type View = 'dashboard' | 'expenses' | 'sales' | 'ledger' | 'settings' | 'payroll' | 'subscriptions' | 'suppliers' | 'inventory' | 'transactions';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('dashboard');
@@ -1210,6 +1211,7 @@ const App: React.FC = () => {
     { id: 'payroll', label: 'حقوق و دستمزد', icon: Wallet, view: 'payroll' },
     { id: 'ledger', label: 'دفتر کل', icon: Book, view: 'ledger' },
     { id: 'inventory', label: 'مدیریت انبار', icon: Package, view: 'inventory' },
+    { id: 'transactions', label: 'مدیریت تراکنش‌ها', icon: History, view: 'transactions' },
     { id: 'settings', label: 'تنظیمات', icon: SettingsIcon, view: 'settings' },
   ];
 
@@ -1310,10 +1312,23 @@ const App: React.FC = () => {
             onAddItem={handleAddInventoryItem}
             onUpdateItem={handleUpdateInventoryItem}
             onRegisterUsage={handleRegisterUsage}
+            onPurchase={handleInventoryPurchase}
+            accounts={accounts}
+            suppliers={suppliers}
+          />
+        );
+      case 'transactions': // Added new case
+        return (
+          <TransactionManager
+            sales={sales}
+            purchases={purchases}
+            payrollPayments={payrollPayments}
+            journals={journals}
+            accounts={accounts}
           />
         );
       default:
-        return <Dashboard accounts={accounts} sales={sales} purchases={purchases} subscriptions={subscriptions} onViewSubscriptions={() => setCurrentView('subscriptions')} />;
+        return <Dashboard accounts={accounts} sales={sales} purchases={purchases} subscriptions={subscriptions} payrollPayments={payrollPayments} onViewSubscriptions={() => setCurrentView('subscriptions')} />;
     }
   };
 

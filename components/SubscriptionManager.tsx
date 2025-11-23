@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Customer, Subscription, SaleRecord, Account, AccountType } from '../types';
-import { toPersianDate, formatPrice, calculateSubscriptionEndDate, isDeliveryDay } from '../utils';
+import { toPersianDate, formatPrice, calculateSubscriptionEndDate, isDeliveryDay, calculateDeliveryDays } from '../utils';
 import { Users, Calendar, Search, Plus, User, FileText, CheckCircle, XCircle, Clock, CreditCard, AlertTriangle, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -40,6 +40,11 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
     const [renewPrice, setRenewPrice] = useState('');
     const [renewPaymentAccount, setRenewPaymentAccount] = useState('');
     const [renewIsCredit, setRenewIsCredit] = useState(false);
+
+    // Manual Date State
+    const [isManualDate, setIsManualDate] = useState(false);
+    const [manualStartDate, setManualStartDate] = useState('');
+    const [manualEndDate, setManualEndDate] = useState('');
 
     // Daily List Logic
     const today = new Date();
@@ -103,20 +108,39 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
         e.preventDefault();
         if (!selectedCustomer) return;
 
-        const startDate = new Date();
-        // If today is Friday, start tomorrow? Or just let logic handle it (start date is today, but first delivery is tomorrow)
-        // calculateSubscriptionEndDate handles logic from startDate.
+        let startDateStr = '';
+        let endDateStr = '';
+        let totalDays = 0;
+        let planName = '';
 
-        const endDate = calculateSubscriptionEndDate(startDate, renewPlanDays);
+        if (isManualDate) {
+            if (!manualStartDate || !manualEndDate) {
+                toast.error('لطفاً تاریخ شروع و پایان را وارد کنید');
+                return;
+            }
+            startDateStr = manualStartDate;
+            endDateStr = manualEndDate;
+
+            // Calculate delivery days using utility
+            totalDays = calculateDeliveryDays(startDateStr, endDateStr);
+            planName = `دستی (${totalDays} روز)`;
+        } else {
+            const startDate = new Date();
+            startDateStr = toPersianDate(startDate);
+            const endDate = calculateSubscriptionEndDate(startDate, renewPlanDays);
+            endDateStr = toPersianDate(endDate);
+            totalDays = renewPlanDays;
+            planName = `${renewPlanDays} روزه`;
+        }
 
         const newSub: Subscription = {
             id: `SUB-${Math.floor(Math.random() * 10000)}`,
             customerId: selectedCustomer.id,
-            planName: `${renewPlanDays} روزه`,
-            startDate: toPersianDate(startDate),
-            endDate: toPersianDate(endDate),
-            totalDeliveryDays: renewPlanDays,
-            remainingDays: renewPlanDays,
+            planName: planName,
+            startDate: startDateStr,
+            endDate: endDateStr,
+            totalDeliveryDays: totalDays,
+            remainingDays: totalDays,
             status: 'ACTIVE',
             price: parseFloat(renewPrice),
             paymentStatus: renewIsCredit ? 'CREDIT' : 'PAID',
@@ -124,10 +148,10 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
 
         const newSale: SaleRecord = {
             id: `SAL-${Math.floor(Math.random() * 10000)}`,
-            stream: 'SUBSCRIPTION' as any, // Cast to avoid import issue if enum not exported
+            stream: 'SUBSCRIPTION' as any,
             amount: renewIsCredit ? 0 : parseFloat(renewPrice),
-            date: toPersianDate(startDate),
-            details: `اشتراک ${selectedCustomer.name} - ${renewPlanDays} روزه`,
+            date: startDateStr,
+            details: `اشتراک ${selectedCustomer.name} - ${planName}`,
             customerId: selectedCustomer.id,
             subscriptionId: newSub.id,
             paymentAccountId: renewIsCredit ? undefined : renewPaymentAccount,
@@ -135,7 +159,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
 
         onAddSubscription(newSub, newSale);
 
-        // Update Customer (balance if credit, and always set activeSubscriptionId)
+        // Update Customer
         const updatedCustomer = {
             ...selectedCustomer,
             balance: renewIsCredit ? selectedCustomer.balance - parseFloat(renewPrice) : selectedCustomer.balance,
@@ -147,6 +171,11 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
         setRenewPrice('');
         setRenewPaymentAccount('');
         setRenewIsCredit(false);
+        // Reset manual state
+        setIsManualDate(false);
+        setManualStartDate('');
+        setManualEndDate('');
+
         toast.success('اشتراک تمدید شد');
     };
 
@@ -414,21 +443,64 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
                         <div className="bg-white rounded-2xl w-full max-w-md p-6">
                             <h3 className="text-xl font-bold mb-4">تمدید اشتراک برای {selectedCustomer.name}</h3>
                             <form onSubmit={handleRenew} className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-bold text-slate-700 mb-1">مدت پکیج (روزهای ارسال)</label>
-                                    <select
-                                        value={renewPlanDays}
-                                        onChange={(e) => setRenewPlanDays(parseInt(e.target.value))}
-                                        className="w-full p-2 border border-slate-300 rounded-lg"
-                                    >
-                                        <option value={6}>۱ هفته (۶ روز)</option>
-                                        <option value={12}>۲ هفته (۱۲ روز)</option>
-                                        <option value={24}>۱ ماه (۲۴ روز)</option>
-                                    </select>
-                                    <p className="text-xs text-slate-500 mt-1">
-                                        تاریخ پایان به صورت خودکار با کسر جمعه‌ها محاسبه می‌شود.
-                                    </p>
+
+                                {/* Manual Date Toggle */}
+                                <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex items-center justify-between">
+                                    <span className="text-sm font-bold text-slate-700">تنظیم دستی تاریخ</span>
+                                    <label className="relative inline-flex items-center cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            className="sr-only peer"
+                                            checked={isManualDate}
+                                            onChange={(e) => setIsManualDate(e.target.checked)}
+                                        />
+                                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                                    </label>
                                 </div>
+
+                                {isManualDate ? (
+                                    <div className="grid grid-cols-2 gap-4 animate-fade-in-down">
+                                        <div>
+                                            <PersianDatePicker
+                                                label="تاریخ شروع"
+                                                value={manualStartDate}
+                                                onChange={setManualStartDate}
+                                                placeholder="انتخاب کنید"
+                                            />
+                                        </div>
+                                        <div>
+                                            <PersianDatePicker
+                                                label="تاریخ پایان"
+                                                value={manualEndDate}
+                                                onChange={setManualEndDate}
+                                                placeholder="انتخاب کنید"
+                                                minDate={manualStartDate}
+                                            />
+                                        </div>
+                                        <div className="col-span-2 text-xs text-indigo-600 text-center font-bold">
+                                            {manualStartDate && manualEndDate && (
+                                                <span>تعداد روزهای ارسال: {calculateDeliveryDays(manualStartDate, manualEndDate)} روز</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="animate-fade-in">
+                                        <label className="block text-sm font-bold text-slate-700 mb-1">مدت پکیج (روزهای ارسال)</label>
+                                        <select
+                                            value={renewPlanDays}
+                                            onChange={(e) => setRenewPlanDays(parseInt(e.target.value))}
+                                            className="w-full p-2 border border-slate-300 rounded-lg"
+                                        >
+                                            <option value={6}>۱ هفته (۶ روز)</option>
+                                            <option value={12}>۲ هفته (۱۲ روز)</option>
+                                            <option value={24}>۱ ماه (۲۴ روز)</option>
+                                        </select>
+                                        <p className="text-xs text-slate-500 mt-1">
+                                            تاریخ پایان به صورت خودکار با کسر جمعه‌ها محاسبه می‌شود.
+                                        </p>
+                                    </div>
+                                )}
+
                                 <div>
                                     <label className="block text-sm font-bold text-slate-700 mb-1">مبلغ پکیج</label>
                                     <input
@@ -495,5 +567,6 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
 
 // Helper icon import fix
 import { RefreshCw } from 'lucide-react';
+import PersianDatePicker from './PersianDatePicker';
 
 export default SubscriptionManager;
