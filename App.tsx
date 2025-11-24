@@ -297,10 +297,8 @@ const App: React.FC = () => {
         await firestoreAddAccount(data);
         toast.success('حساب جدید با موفقیت ایجاد شد');
       } catch (error) {
-        console.error('Firebase error, using local state:', error);
-        setUseFirebase(false);
-        setAccounts(prev => [...prev, newAccount]);
-        toast.success('حساب جدید ایجاد شد (ذخیره محلی)');
+        console.error('Firebase error:', error);
+        toast.error('خطا در ایجاد حساب. لطفاً اتصال اینترنت را بررسی کنید.');
       }
     } else {
       setAccounts(prev => [...prev, newAccount]);
@@ -314,10 +312,8 @@ const App: React.FC = () => {
         await firestoreUpdateAccount(id, { name, balance });
         toast.success('حساب با موفقیت ویرایش شد');
       } catch (error) {
-        console.error('Firebase error, using local state:', error);
-        setUseFirebase(false);
-        setAccounts(prev => prev.map(acc => acc.id === id ? { ...acc, name, balance } : acc));
-        toast.success('حساب ویرایش شد (ذخیره محلی)');
+        console.error('Firebase error:', error);
+        toast.error('خطا در ویرایش حساب. لطفاً اتصال اینترنت را بررسی کنید.');
       }
     } else {
       setAccounts(prev => prev.map(acc => acc.id === id ? { ...acc, name, balance } : acc));
@@ -331,10 +327,8 @@ const App: React.FC = () => {
         await firestoreDeleteAccount(id);
         toast.success('حساب با موفقیت حذف شد');
       } catch (error) {
-        console.error('Firebase error, using local state:', error);
-        setUseFirebase(false);
-        setAccounts(prev => prev.filter(acc => acc.id !== id));
-        toast.success('حساب حذف شد (ذخیره محلی)');
+        console.error('Firebase error:', error);
+        toast.error('خطا در حذف حساب. لطفاً اتصال اینترنت را بررسی کنید.');
       }
     } else {
       setAccounts(prev => prev.filter(acc => acc.id !== id));
@@ -348,10 +342,8 @@ const App: React.FC = () => {
         await firestoreDeletePurchase(id);
         toast.success('هزینه با موفقیت حذف شد');
       } catch (error) {
-        console.error('Firebase error, using local state:', error);
-        setUseFirebase(false);
-        setPurchases(prev => prev.filter(p => p.id !== id));
-        toast.success('هزینه حذف شد (ذخیره محلی)');
+        console.error('Firebase error:', error);
+        toast.error('خطا در حذف تأمین‌کننده. لطفاً اتصال اینترنت را بررسی کنید.');
       }
     } else {
       setPurchases(prev => prev.filter(p => p.id !== id));
@@ -366,10 +358,8 @@ const App: React.FC = () => {
         await firestoreAddEmployee(emp);
         toast.success('پرسنل جدید با موفقیت اضافه شد');
       } catch (error) {
-        console.error('Firebase error, using local state:', error);
-        setUseFirebase(false);
-        setEmployees(prev => [...prev, emp]);
-        toast.success('پرسنل جدید اضافه شد (ذخیره محلی)');
+        console.error('Firebase error:', error);
+        toast.error('خطا در افزودن تأمین‌کننده. لطفاً اتصال اینترنت را بررسی کنید.');
       }
     } else {
       setEmployees(prev => [...prev, emp]);
@@ -383,10 +373,8 @@ const App: React.FC = () => {
         await firestoreDeleteEmployee(id);
         toast.success('پرسنل با موفقیت حذف شد');
       } catch (error) {
-        console.error('Firebase error, using local state:', error);
-        setUseFirebase(false);
-        setEmployees(prev => prev.filter(e => e.id !== id));
-        toast.success('پرسنل حذف شد (ذخیره محلی)');
+        console.error('Firebase error:', error);
+        toast.error('خطا در حذف مشتری. لطفاً اتصال اینترنت را بررسی کنید.');
       }
     } else {
       setEmployees(prev => prev.filter(e => e.id !== id));
@@ -401,10 +389,8 @@ const App: React.FC = () => {
         await firestoreAddCustomer(customer);
         toast.success('مشتری جدید با موفقیت اضافه شد');
       } catch (error) {
-        console.error('Firebase error, using local state:', error);
-        setUseFirebase(false);
-        setCustomers(prev => [...prev, customer]);
-        toast.success('مشتری جدید اضافه شد (ذخیره محلی)');
+        console.error('Firebase error:', error);
+        toast.error('خطا در افزودن مشتری. لطفاً اتصال اینترنت را بررسی کنید.');
       }
     } else {
       setCustomers(prev => [...prev, customer]);
@@ -418,10 +404,8 @@ const App: React.FC = () => {
         await firestoreUpdateCustomer(customer.id, customer);
         toast.success('اطلاعات مشتری به‌روزرسانی شد');
       } catch (error) {
-        console.error('Firebase error, using local state:', error);
-        setUseFirebase(false);
-        setCustomers(prev => prev.map(c => c.id === customer.id ? customer : c));
-        toast.success('اطلاعات مشتری به‌روزرسانی شد (ذخیره محلی)');
+        console.error('Firebase error:', error);
+        toast.error('خطا در ویرایش مشتری. لطفاً اتصال اینترنت را بررسی کنید.');
       }
     } else {
       setCustomers(prev => prev.map(c => c.id === customer.id ? customer : c));
@@ -500,14 +484,8 @@ const App: React.FC = () => {
 
         toast.success('اشتراک با موفقیت ثبت شد');
       } catch (error) {
-        console.error('Firebase error, using local state:', error);
-        setUseFirebase(false);
-        setSubscriptions(prev => [...prev, subscription]);
-        setSales(prev => [sale, ...prev]);
-        setCustomers(prev => prev.map(c =>
-          c.id === subscription.customerId ? { ...c, activeSubscriptionId: subscription.id } : c
-        ));
-        toast.success('اشتراک ثبت شد (ذخیره محلی)');
+        console.error('Firebase error:', error);
+        toast.error('خطا در ثبت اشتراک. لطفاً اتصال اینترنت را بررسی کنید.');
       }
     } else {
       setSubscriptions(prev => [...prev, subscription]);
@@ -866,17 +844,8 @@ const App: React.FC = () => {
 
           toast.success('خرید تایید و سند حسابداری صادر شد');
         } catch (error) {
-          console.error('Firebase error, using local state:', error);
-          setUseFirebase(false); // Fallback to local state
-          // Local Fallback for purchase, journal, and accounts
-          setPurchases(prev => prev.map(p => p.id === id ? { ...p, status: TransactionStatus.APPROVED } : p));
-          setJournals(prev => [journalEntry, ...prev]);
-          setAccounts(prev => prev.map(a => {
-            if (a.id === expenseAccount.id) return { ...a, balance: a.balance + purchase.amount };
-            if (a.id === creditAccount.id) return { ...a, balance: creditAccount.type === AccountType.ASSET ? a.balance - purchase.amount : a.balance + purchase.amount };
-            return a;
-          }));
-          toast.success('خرید تایید شد (ذخیره محلی)');
+          console.error('Firebase error:', error);
+          toast.error('خطا در تأیید خرید. لطفاً اتصال اینترنت را بررسی کنید.');
         }
       } else {
         // Local Fallback
@@ -908,10 +877,8 @@ const App: React.FC = () => {
         await firestoreUpdatePurchase(id, { status: TransactionStatus.REJECTED });
         toast.success('خرید رد شد');
       } catch (error) {
-        console.error('Firebase error, using local state:', error);
-        setUseFirebase(false);
-        setPurchases(prev => prev.map(p => p.id === id ? { ...p, status: TransactionStatus.REJECTED } : p));
-        toast.success('خرید رد شد (ذخیره محلی)');
+        console.error('Firebase error:', error);
+        toast.error('خطا در رد خرید. لطفاً اتصال اینترنت را بررسی کنید.');
       }
     } else {
       setPurchases(prev => prev.map(p => p.id === id ? { ...p, status: TransactionStatus.REJECTED } : p));
@@ -925,10 +892,9 @@ const App: React.FC = () => {
         await firestoreAddPurchase(p);
         toast.success('درخواست خرید ثبت شد');
       } catch (error) {
-        console.error('Firebase error, using local state:', error);
-        setUseFirebase(false);
-        setPurchases(prev => [p, ...prev]);
-        toast.success('درخواست خرید ثبت شد (ذخیره محلی)');
+        console.error('Firebase error:', error);
+        toast.error('خطا در ارتباط با سرور. لطفاً اتصال اینترنت و VPN را بررسی کنید و دوباره تلاش کنید.');
+        // Do NOT fallback to local state - data would be lost on iOS reload
       }
     } else {
       setPurchases(prev => [p, ...prev]);
@@ -1025,19 +991,8 @@ const App: React.FC = () => {
             }
             toast.success('فروش با موفقیت ثبت شد');
           } catch (error) {
-            console.error('Firebase error, using local state:', error);
-            setUseFirebase(false);
-            setSales(prev => [sale, ...prev]);
-            setJournals(prev => [...prev, journalEntry]);
-            setAccounts(prev => prev.map(acc => {
-              if (acc.id === cashOnHandAccount.id) return { ...acc, balance: acc.balance + cashReceived };
-              if (acc.id === bankAccount.id) return { ...acc, balance: acc.balance + totalBankDeposit };
-              if (acc.id === revenueAccount.id) return { ...acc, balance: acc.balance + (sale.grossAmount || 0) };
-              if (sale.discount && sale.discount > 0 && acc.id === discountAccount.id) return { ...acc, balance: acc.balance + sale.discount };
-              if (sale.refund && sale.refund > 0 && acc.id === refundAccount.id) return { ...acc, balance: acc.balance + sale.refund };
-              return acc;
-            }));
-            toast.success('فروش ثبت شد (ذخیره محلی)');
+            console.error('Firebase error:', error);
+            toast.error('خطا در ثبت فروش. لطفاً اتصال اینترنت و VPN را بررسی کنید.');
           }
         } else {
           setSales(prev => [sale, ...prev]);
@@ -1088,16 +1043,9 @@ const App: React.FC = () => {
             });
             toast.success('فروش با موفقیت ثبت شد');
           } catch (error) {
-            console.error('Firebase error, using local state:', error);
-            setUseFirebase(false);
-            setSales(prev => [sale, ...prev]);
-            setJournals(prev => [...prev, journalEntry]);
-            setAccounts(prev => prev.map(acc => {
-              if (acc.id === cashAccount.id) return { ...acc, balance: acc.balance + sale.amount };
-              if (acc.id === creditAccount.id) return { ...acc, balance: acc.balance + sale.amount };
-              return acc;
-            }));
-            toast.success('فروش ثبت شد (ذخیره محلی)');
+            console.error('Firebase error:', error);
+            toast.error('خطا در ارتباط با سرور. لطفاً اتصال اینترنت و VPN را بررسی کنید و دوباره تلاش کنید.');
+            // Do NOT fallback to local state - data would be lost on iOS reload
           }
         } else {
           setSales(prev => [sale, ...prev]);
@@ -1122,10 +1070,8 @@ const App: React.FC = () => {
         await firestoreDeleteSale(id);
         toast.success('تراکنش فروش با موفقیت حذف شد');
       } catch (error) {
-        console.error('Firebase error, using local state:', error);
-        setUseFirebase(false);
-        setSales(prev => prev.filter(s => s.id !== id));
-        toast.success('تراکنش فروش حذف شد (ذخیره محلی)');
+        console.error('Firebase error:', error);
+        toast.error('خطا در حذف تراکنش. لطفاً اتصال اینترنت را بررسی کنید.');
       }
     } else {
       setSales(prev => prev.filter(s => s.id !== id));
