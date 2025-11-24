@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { Account, AccountType, PurchaseRequest, TransactionStatus, UserRole, Supplier, InventoryItem } from '../types';
 import { toPersianDate, formatPrice } from '../utils';
-import { Plus, Check, X, FileText, Upload, Image as ImageIcon, Trash2, Search, Filter, BarChart3, Scale, CreditCard, AlertTriangle, Package, ChevronDown } from 'lucide-react';
+import { Plus, Check, X, FileText, Upload, Image as ImageIcon, Trash2, Search, Filter, BarChart3, Scale, CreditCard, AlertTriangle, Package, ChevronDown, Calendar } from 'lucide-react';
+import PersianDatePicker from './PersianDatePicker';
 
 interface ExpensesProps {
   accounts: Account[];
@@ -57,6 +58,9 @@ const Expenses: React.FC<ExpensesProps> = ({
   // All users can approve
   const canApprove = true;
 
+  const [isBackdated, setIsBackdated] = useState(false);
+  const [customDate, setCustomDate] = useState('');
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -66,15 +70,23 @@ const Expenses: React.FC<ExpensesProps> = ({
       return;
     }
 
+    if (isBackdated && !customDate) {
+      alert('لطفاً تاریخ خرید را وارد کنید');
+      return;
+    }
+
     const amount = parseFloat(formData.amount);
     const quantity = formData.quantity ? parseFloat(formData.quantity) : 0;
+
+    // Use custom date if backdated, otherwise use current date
+    const purchaseDate = isBackdated ? customDate : toPersianDate(new Date());
 
     const newPurchase: PurchaseRequest = {
       id: `PUR-${Math.floor(Math.random() * 10000)}`,
       ...formData,
       amount: amount,
       status: TransactionStatus.PENDING,
-      date: toPersianDate(new Date()),
+      date: purchaseDate,
       imageUrl: fileName ? 'uploaded-mock-url' : undefined,
       quantity: quantity,
       unit: formData.quantity ? formData.unit : undefined,
@@ -129,6 +141,8 @@ const Expenses: React.FC<ExpensesProps> = ({
       inventoryItemId: ''
     });
     setFileName('');
+    setIsBackdated(false);
+    setCustomDate('');
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -448,6 +462,43 @@ const Expenses: React.FC<ExpensesProps> = ({
                 className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                 placeholder="مثلاً: فیله مرغ، قهوه عربیکا..."
               />
+            </div>
+
+            {/* Date Selection */}
+            <div className="md:col-span-2 bg-slate-50 p-4 rounded-xl border border-slate-200">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-slate-500" />
+                  <span className="font-bold text-slate-700">تاریخ خرید</span>
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <div className="relative inline-flex items-center">
+                    <input
+                      type="checkbox"
+                      className="sr-only peer"
+                      checked={isBackdated}
+                      onChange={(e) => setIsBackdated(e.target.checked)}
+                    />
+                    <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                  </div>
+                  <span className="text-sm text-slate-600">ثبت برای تاریخ گذشته</span>
+                </label>
+              </div>
+
+              {isBackdated ? (
+                <div className="animate-fade-in-down">
+                  <PersianDatePicker
+                    label="انتخاب تاریخ خرید"
+                    value={customDate}
+                    onChange={setCustomDate}
+                  />
+                </div>
+              ) : (
+                <div className="text-sm text-slate-500 flex items-center gap-2 bg-white p-3 rounded-lg border border-slate-200">
+                  <Check className="w-4 h-4 text-emerald-500" />
+                  خرید با تاریخ امروز ({toPersianDate(new Date())}) ثبت می‌شود.
+                </div>
+              )}
             </div>
 
             <div className="md:col-span-2">
