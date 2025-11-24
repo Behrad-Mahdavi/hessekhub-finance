@@ -356,6 +356,7 @@ const Expenses: React.FC<ExpensesProps> = ({
                   <option>هزینه اجاره</option>
                   <option>هزینه آب و برق</option>
                   <option>ملزومات اداری</option>
+                  <option>بیمه</option>
                   <option>تعمیرات و نگهداری</option>
                   <option>تبلیغات و بازاریابی</option>
                 </select>

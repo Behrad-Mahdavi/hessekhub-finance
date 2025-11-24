@@ -12,7 +12,7 @@ export const INITIAL_ACCOUNTS: Account[] = [
   { id: '101', code: '1010', name: 'موجودی نقد (صندوق)', type: AccountType.ASSET, balance: 50000000 },
   { id: '102', code: '1020', name: 'حساب بانکی', type: AccountType.ASSET, balance: 120000000 },
   { id: '201', code: '2010', name: 'حساب‌های پرداختنی', type: AccountType.LIABILITY, balance: 0 },
-  { id: '202', code: '2020', name: 'پیش‌دریافت درآمد اشتراک', type: AccountType.LIABILITY, balance: 0 }, 
+  { id: '202', code: '2020', name: 'پیش‌دریافت درآمد اشتراک', type: AccountType.LIABILITY, balance: 0 },
   { id: '301', code: '3010', name: 'سرمایه اولیه', type: AccountType.EQUITY, balance: 170000000 },
   { id: '401', code: '4010', name: 'درآمد کافه', type: AccountType.REVENUE, balance: 0 },
   { id: '402', code: '4020', name: 'درآمد تحقق‌یافته اشتراک', type: AccountType.REVENUE, balance: 0 },
@@ -22,6 +22,7 @@ export const INITIAL_ACCOUNTS: Account[] = [
   { id: '503', code: '5030', name: 'ملزومات اداری', type: AccountType.EXPENSE, balance: 0 },
   { id: '504', code: '5040', name: 'هزینه اجاره', type: AccountType.EXPENSE, balance: 0 },
   { id: '505', code: '5050', name: 'هزینه حقوق و دستمزد', type: AccountType.EXPENSE, balance: 0 },
+  { id: '506', code: '5060', name: 'بیمه', type: AccountType.EXPENSE, balance: 0 },
   { id: '510', code: '5110', name: 'تخفیفات فروش', type: AccountType.EXPENSE, balance: 0 }, // Treated as Expense/Contra-Revenue
   { id: '511', code: '5120', name: 'برگشت از فروش', type: AccountType.EXPENSE, balance: 0 }, // Treated as Expense/Contra-Revenue
 ];
