@@ -1,19 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { SaleRecord, RevenueStream, UserRole, SubscriptionStatus, Account, AccountType } from '../types';
+import { SaleRecord, RevenueStream, UserRole, SubscriptionStatus, Account, AccountType, Employee } from '../types';
 import { toPersianDate, formatPrice } from '../utils';
-import { Coffee, Users, Activity, PlusCircle, Clock, Calculator, RefreshCw, Ban, AlertTriangle, User, Trash2, CreditCard, Banknote, ChevronDown, ChevronUp } from 'lucide-react';
+import { Coffee, Users, Activity, PlusCircle, Clock, Calculator, RefreshCw, Ban, AlertTriangle, User, Trash2, CreditCard, Banknote, ChevronDown, ChevronUp, Truck, UserMinus } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface SalesProps {
     sales: SaleRecord[];
     accounts: Account[];
+    employees: Employee[]; // New prop
     onAddSale: (s: SaleRecord) => void;
     onCancelSubscription?: (id: string, refundAmount: number) => void;
     onDeleteSale: (id: string) => void;
     userRole: UserRole;
 }
 
-const Sales: React.FC<SalesProps> = ({ sales, accounts, onAddSale, onCancelSubscription, onDeleteSale, userRole }) => {
+const Sales: React.FC<SalesProps> = ({ sales, accounts, employees, onAddSale, onCancelSubscription, onDeleteSale, userRole }) => {
     const [activeTab, setActiveTab] = useState<RevenueStream>(RevenueStream.CAFE);
 
     // Common State
@@ -26,6 +27,15 @@ const Sales: React.FC<SalesProps> = ({ sales, accounts, onAddSale, onCancelSubsc
     const [grossAmount, setGrossAmount] = useState('');
     const [discount, setDiscount] = useState('');
     const [refund, setRefund] = useState('');
+
+    // Delivery Apps State
+    const [snappFoodAmount, setSnappFoodAmount] = useState('');
+    const [tapsiFoodAmount, setTapsiFoodAmount] = useState('');
+    const [foodexAmount, setFoodexAmount] = useState('');
+
+    // Employee Credit State
+    const [employeeCreditAmount, setEmployeeCreditAmount] = useState('');
+    const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
 
     // Payment Details State
     const [paymentAccountId, setPaymentAccountId] = useState('');
@@ -50,13 +60,25 @@ const Sales: React.FC<SalesProps> = ({ sales, accounts, onAddSale, onCancelSubsc
         setC2cTransactions([]);
         setTempC2cAmount('');
         setTempC2cSender('');
+
+        setSnappFoodAmount('');
+        setTapsiFoodAmount('');
+        setFoodexAmount('');
+        setEmployeeCreditAmount('');
+        setSelectedEmployeeId('');
     }, [activeTab]);
 
     const calculateNet = () => {
         const pos = parseFloat(grossAmount) || 0;
         const cash = parseFloat(cashAmount) || 0;
         const c2cTotal = c2cTransactions.reduce((sum, t) => sum + t.amount, 0);
-        const totalGross = pos + cash + c2cTotal;
+
+        const snapp = parseFloat(snappFoodAmount) || 0;
+        const tapsi = parseFloat(tapsiFoodAmount) || 0;
+        const foodex = parseFloat(foodexAmount) || 0;
+        const empCredit = parseFloat(employeeCreditAmount) || 0;
+
+        const totalGross = pos + cash + c2cTotal + snapp + tapsi + foodex + empCredit;
 
         const d = parseFloat(discount) || 0;
         const r = parseFloat(refund) || 0;
@@ -98,7 +120,12 @@ const Sales: React.FC<SalesProps> = ({ sales, accounts, onAddSale, onCancelSubsc
             const cash = parseFloat(cashAmount) || 0;
             const c2cTotal = c2cTransactions.reduce((sum, t) => sum + t.amount, 0);
 
-            const totalGross = pos + cash + c2cTotal;
+            const snapp = parseFloat(snappFoodAmount) || 0;
+            const tapsi = parseFloat(tapsiFoodAmount) || 0;
+            const foodex = parseFloat(foodexAmount) || 0;
+            const empCredit = parseFloat(employeeCreditAmount) || 0;
+
+            const totalGross = pos + cash + c2cTotal + snapp + tapsi + foodex + empCredit;
             const d = parseFloat(discount) || 0;
             const r = parseFloat(refund) || 0;
             finalAmount = totalGross - d - r;
@@ -108,12 +135,27 @@ const Sales: React.FC<SalesProps> = ({ sales, accounts, onAddSale, onCancelSubsc
                 return;
             }
 
+            if (empCredit > 0 && !selectedEmployeeId) {
+                toast.error('لطفاً پرسنل مورد نظر برای نسیه را انتخاب کنید');
+                return;
+            }
+
             saleRecord.amount = finalAmount;
             saleRecord.grossAmount = totalGross;
             saleRecord.posAmount = pos;
             saleRecord.discount = d;
             saleRecord.refund = r;
             saleRecord.cardToCardTransactions = c2cTransactions;
+
+            saleRecord.snappFoodAmount = snapp;
+            saleRecord.tapsiFoodAmount = tapsi;
+            saleRecord.foodexAmount = foodex;
+            saleRecord.employeeCreditAmount = empCredit;
+            saleRecord.employeeId = selectedEmployeeId;
+            if (selectedEmployeeId) {
+                const emp = employees.find(e => e.id === selectedEmployeeId);
+                if (emp) saleRecord.employeeName = emp.fullName;
+            }
         } else {
             // ASSESSMENT - Simple amount
             finalAmount = parseFloat(simpleAmount) || 0;
@@ -134,6 +176,13 @@ const Sales: React.FC<SalesProps> = ({ sales, accounts, onAddSale, onCancelSubsc
         setC2cTransactions([]);
         setTempC2cAmount('');
         setTempC2cSender('');
+
+        setSnappFoodAmount('');
+        setTapsiFoodAmount('');
+        setFoodexAmount('');
+        setEmployeeCreditAmount('');
+        setSelectedEmployeeId('');
+
         setShowPaymentDetails(false);
     };
 
@@ -221,6 +270,72 @@ const Sales: React.FC<SalesProps> = ({ sales, accounts, onAddSale, onCancelSubsc
                                             onChange={(e) => setRefund(e.target.value)}
                                             className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-rose-500 outline-none dir-ltr text-left text-rose-600"
                                             placeholder="0"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Delivery Apps Section */}
+                                <div className="grid grid-cols-3 gap-3">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1 flex items-center gap-1">
+                                            <Truck className="w-3 h-3" /> اسنپ فود
+                                        </label>
+                                        <input
+                                            type="number"
+                                            value={snappFoodAmount}
+                                            onChange={(e) => setSnappFoodAmount(e.target.value)}
+                                            className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none dir-ltr text-left"
+                                            placeholder="0"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1 flex items-center gap-1">
+                                            <Truck className="w-3 h-3" /> تپسی فود
+                                        </label>
+                                        <input
+                                            type="number"
+                                            value={tapsiFoodAmount}
+                                            onChange={(e) => setTapsiFoodAmount(e.target.value)}
+                                            className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none dir-ltr text-left"
+                                            placeholder="0"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1 flex items-center gap-1">
+                                            <Truck className="w-3 h-3" /> فودکس
+                                        </label>
+                                        <input
+                                            type="number"
+                                            value={foodexAmount}
+                                            onChange={(e) => setFoodexAmount(e.target.value)}
+                                            className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none dir-ltr text-left"
+                                            placeholder="0"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Employee Credit Section */}
+                                <div className="bg-amber-50 p-3 rounded-xl border border-amber-100">
+                                    <label className="block text-xs font-bold text-amber-700 uppercase mb-2 flex items-center gap-1">
+                                        <UserMinus className="w-3 h-3" /> نسیه پرسنل
+                                    </label>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <select
+                                            value={selectedEmployeeId}
+                                            onChange={(e) => setSelectedEmployeeId(e.target.value)}
+                                            className="w-full p-2 border border-amber-200 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none bg-white text-sm"
+                                        >
+                                            <option value="">انتخاب پرسنل...</option>
+                                            {employees.map(emp => (
+                                                <option key={emp.id} value={emp.id}>{emp.fullName}</option>
+                                            ))}
+                                        </select>
+                                        <input
+                                            type="number"
+                                            value={employeeCreditAmount}
+                                            onChange={(e) => setEmployeeCreditAmount(e.target.value)}
+                                            className="w-full p-2 border border-amber-200 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none dir-ltr text-left"
+                                            placeholder="مبلغ نسیه"
                                         />
                                     </div>
                                 </div>

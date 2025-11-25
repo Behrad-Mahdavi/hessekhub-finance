@@ -912,6 +912,10 @@ const App: React.FC = () => {
         const revenueAccount = accounts.find(a => a.code === '4010')!; // Cafe Revenue
         const discountAccount = accounts.find(a => a.code === '5110')!; // Discounts
         const refundAccount = accounts.find(a => a.code === '5120')!; // Returns
+        const snappFoodAccount = accounts.find(a => a.code === '1030')!;
+        const tapsiFoodAccount = accounts.find(a => a.code === '1040')!;
+        const foodexAccount = accounts.find(a => a.code === '1050')!;
+        const employeeReceivableAccount = accounts.find(a => a.code === '1060')!;
         const cashOnHandAccount = accounts.find(a => a.code === '1010')!; // Cash on Hand
 
         // Determine Receiving Bank Account (POS/C2C)
@@ -927,6 +931,11 @@ const App: React.FC = () => {
         const c2cTotal = c2cTransactions.reduce((sum, t) => sum + t.amount, 0);
         const posReceived = sale.posAmount || 0;
 
+        const snappAmount = sale.snappFoodAmount || 0;
+        const tapsiAmount = sale.tapsiFoodAmount || 0;
+        const foodexAmount = sale.foodexAmount || 0;
+        const empCreditAmount = sale.employeeCreditAmount || 0;
+
         // 1. Debit Cash on Hand
         if (cashReceived > 0) {
           newLines.push({ accountId: cashOnHandAccount.id, accountName: cashOnHandAccount.name, debit: cashReceived, credit: 0 });
@@ -937,6 +946,12 @@ const App: React.FC = () => {
         if (totalBankDeposit > 0) {
           newLines.push({ accountId: bankAccount.id, accountName: bankAccount.name, debit: totalBankDeposit, credit: 0 });
         }
+
+        // 3. Debit Delivery Apps & Employee Credit
+        if (snappAmount > 0) newLines.push({ accountId: snappFoodAccount.id, accountName: snappFoodAccount.name, debit: snappAmount, credit: 0 });
+        if (tapsiAmount > 0) newLines.push({ accountId: tapsiFoodAccount.id, accountName: tapsiFoodAccount.name, debit: tapsiAmount, credit: 0 });
+        if (foodexAmount > 0) newLines.push({ accountId: foodexAccount.id, accountName: foodexAccount.name, debit: foodexAmount, credit: 0 });
+        if (empCreditAmount > 0) newLines.push({ accountId: employeeReceivableAccount.id, accountName: employeeReceivableAccount.name, debit: empCreditAmount, credit: 0 });
 
         // Debit Discounts (if any)
         if (sale.discount && sale.discount > 0) {
@@ -955,10 +970,19 @@ const App: React.FC = () => {
           ? ` (واریزها: ${c2cTransactions.map(t => `${t.sender} ${t.amount.toLocaleString()}`).join('، ')})`
           : '';
 
+        const deliveryDetails = [
+          snappAmount > 0 ? `اسنپ: ${snappAmount.toLocaleString()}` : '',
+          tapsiAmount > 0 ? `تپسی: ${tapsiAmount.toLocaleString()}` : '',
+          foodexAmount > 0 ? `فودکس: ${foodexAmount.toLocaleString()}` : '',
+          empCreditAmount > 0 ? `نسیه پرسنل: ${empCreditAmount.toLocaleString()}` : ''
+        ].filter(Boolean).join(' - ');
+
+        const description = `فروش: ${sale.details}${c2cDetails}${deliveryDetails ? ` | ${deliveryDetails}` : ''}`;
+
         const journalEntry: JournalEntry = {
           id: `JRN-${Math.floor(Math.random() * 100000)}`,
           date: sale.date,
-          description: `فروش: ${sale.details}${c2cDetails}`,
+          description: description,
           referenceId: sale.id,
           lines: newLines
         };
@@ -989,6 +1013,12 @@ const App: React.FC = () => {
                 balance: refundAccount.balance + sale.refund
               });
             }
+
+            // Update Delivery & Employee Accounts
+            if (snappAmount > 0) await firestoreUpdateAccount(snappFoodAccount.id, { balance: snappFoodAccount.balance + snappAmount });
+            if (tapsiAmount > 0) await firestoreUpdateAccount(tapsiFoodAccount.id, { balance: tapsiFoodAccount.balance + tapsiAmount });
+            if (foodexAmount > 0) await firestoreUpdateAccount(foodexAccount.id, { balance: foodexAccount.balance + foodexAmount });
+            if (empCreditAmount > 0) await firestoreUpdateAccount(employeeReceivableAccount.id, { balance: employeeReceivableAccount.balance + empCreditAmount });
             toast.success('فروش با موفقیت ثبت شد');
           } catch (error) {
             console.error('Firebase error:', error);
@@ -1003,6 +1033,12 @@ const App: React.FC = () => {
             if (acc.id === revenueAccount.id) return { ...acc, balance: acc.balance + (sale.grossAmount || 0) };
             if (sale.discount && sale.discount > 0 && acc.id === discountAccount.id) return { ...acc, balance: acc.balance + sale.discount };
             if (sale.refund && sale.refund > 0 && acc.id === refundAccount.id) return { ...acc, balance: acc.balance + sale.refund };
+
+            if (snappAmount > 0 && acc.id === snappFoodAccount.id) return { ...acc, balance: acc.balance + snappAmount };
+            if (tapsiAmount > 0 && acc.id === tapsiFoodAccount.id) return { ...acc, balance: acc.balance + tapsiAmount };
+            if (foodexAmount > 0 && acc.id === foodexAccount.id) return { ...acc, balance: acc.balance + foodexAmount };
+            if (empCreditAmount > 0 && acc.id === employeeReceivableAccount.id) return { ...acc, balance: acc.balance + empCreditAmount };
+
             return acc;
           }));
           toast.success('فروش با موفقیت ثبت شد (محلی)');
@@ -1206,10 +1242,11 @@ const App: React.FC = () => {
           <Sales
             sales={sales}
             accounts={accounts}
+            employees={employees}
             onAddSale={handleAddSale}
             onCancelSubscription={handleCancelSubscription}
-            onDeleteSale={handleDeleteSale} // Passed handler
-            userRole={UserRole.ADMIN} // Role removed, passing dummy
+            onDeleteSale={handleDeleteSale}
+            userRole={UserRole.ADMIN}
           />
         ); case 'ledger':
         return (

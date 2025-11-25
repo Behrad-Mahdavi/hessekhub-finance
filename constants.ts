@@ -11,6 +11,10 @@ const daysAgo = (days: number) => {
 export const INITIAL_ACCOUNTS: Account[] = [
   { id: '101', code: '1010', name: 'موجودی نقد (صندوق)', type: AccountType.ASSET, balance: 50000000 },
   { id: '102', code: '1020', name: 'حساب بانکی', type: AccountType.ASSET, balance: 120000000 },
+  { id: '103', code: '1030', name: 'حساب اسنپ فود', type: AccountType.ASSET, balance: 0 },
+  { id: '104', code: '1040', name: 'حساب تپسی فود', type: AccountType.ASSET, balance: 0 },
+  { id: '105', code: '1050', name: 'حساب فودکس', type: AccountType.ASSET, balance: 0 },
+  { id: '106', code: '1060', name: 'حساب دریافتنی پرسنل', type: AccountType.ASSET, balance: 0 },
   { id: '201', code: '2010', name: 'حساب‌های پرداختنی', type: AccountType.LIABILITY, balance: 0 },
   { id: '202', code: '2020', name: 'پیش‌دریافت درآمد اشتراک', type: AccountType.LIABILITY, balance: 0 },
   { id: '301', code: '3010', name: 'سرمایه اولیه', type: AccountType.EQUITY, balance: 170000000 },

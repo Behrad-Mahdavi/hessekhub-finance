@@ -105,6 +105,12 @@ export interface SaleRecord {
   cardToCardTransactions?: { amount: number; sender: string }[]; // New: List of C2C transactions
   customerId?: string; // New: Link to Customer
   subscriptionId?: string; // New: Link to Subscription
+  snappFoodAmount?: number; // New: SnappFood sales
+  tapsiFoodAmount?: number; // New: TapsiFood sales
+  foodexAmount?: number; // New: Foodex sales
+  employeeCreditAmount?: number; // New: Employee credit (Nesiye)
+  employeeId?: string; // New: Link to Employee for credit sales
+  employeeName?: string; // New: Name of employee for credit sales
 }
 
 export interface Customer {

@@ -293,6 +293,14 @@ const TransactionManager: React.FC = () => {
                                         </td>
                                         <td className="p-4 text-sm text-slate-700">
                                             {(t.description || t.details || t.employeeName || '-')}
+                                            {t.type === 'SALE' && (
+                                                <div className="flex flex-wrap gap-x-2 gap-y-1 mt-1 text-xs text-slate-500">
+                                                    {t.snappFoodAmount > 0 && <span className="bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded">اسنپ: {formatPrice(t.snappFoodAmount)}</span>}
+                                                    {t.tapsiFoodAmount > 0 && <span className="bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded">تپسی: {formatPrice(t.tapsiFoodAmount)}</span>}
+                                                    {t.foodexAmount > 0 && <span className="bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded">فودکس: {formatPrice(t.foodexAmount)}</span>}
+                                                    {t.employeeCreditAmount > 0 && <span className="bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded">نسیه {t.employeeName ? `(${t.employeeName})` : ''}: {formatPrice(t.employeeCreditAmount)}</span>}
+                                                </div>
+                                            )}
                                             {t.type === 'EXPENSE' && t.category && <span className="text-xs text-slate-500 block mt-1">دسته: {t.category}</span>}
                                             {t.type === 'INVENTORY' && t.itemName && <span className="text-xs text-slate-500 block mt-1">کالا: {t.itemName}</span>}
                                             {t.customerName && <span className="text-xs text-slate-400 block mt-1">{t.customerName}</span>}
