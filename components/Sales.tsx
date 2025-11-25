@@ -200,7 +200,9 @@ const Sales: React.FC<SalesProps> = ({ sales, accounts, employees, onAddSale, on
         }
     }
 
-    const filteredSales = sales.filter(s => s.stream === activeTab);
+    const filteredSales = sales
+        .filter(s => s.stream === activeTab)
+        .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
 
     return (
         <div className="p-4 md:p-8 h-full flex flex-col overflow-y-auto">
@@ -519,6 +521,16 @@ const Sales: React.FC<SalesProps> = ({ sales, accounts, employees, onAddSale, on
                                             <td className="p-4 text-sm text-slate-600 font-medium">{s.date}</td>
                                             <td className="p-4 text-sm text-slate-800 font-bold">
                                                 {s.details}
+                                                {activeTab === RevenueStream.CAFE && (
+                                                    <div className="flex flex-wrap gap-x-2 gap-y-1 mt-1 text-xs text-slate-500 font-normal">
+                                                        {s.snappFoodAmount && s.snappFoodAmount > 0 && <span className="bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded">اسنپ: {formatPrice(s.snappFoodAmount)}</span>}
+                                                        {s.tapsiFoodAmount && s.tapsiFoodAmount > 0 && <span className="bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded">تپسی: {formatPrice(s.tapsiFoodAmount)}</span>}
+                                                        {s.foodexAmount && s.foodexAmount > 0 && <span className="bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded">فودکس: {formatPrice(s.foodexAmount)}</span>}
+                                                        {s.employeeCreditAmount && s.employeeCreditAmount > 0 && <span className="bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded">نسیه {s.employeeName ? `(${s.employeeName})` : ''}: {formatPrice(s.employeeCreditAmount)}</span>}
+                                                        {s.posAmount && s.posAmount > 0 && <span className="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded">کارتخوان: {formatPrice(s.posAmount)}</span>}
+                                                        {s.cashAmount && s.cashAmount > 0 && <span className="bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded">نقد: {formatPrice(s.cashAmount)}</span>}
+                                                    </div>
+                                                )}
                                                 {s.discount && s.discount > 0 ? <span className="block text-xs text-rose-500 mt-0.5">تخفیف: {s.discount.toLocaleString()}</span> : null}
                                             </td>
                                             {activeTab === RevenueStream.CAFE && (
