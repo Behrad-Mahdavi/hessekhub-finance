@@ -912,11 +912,16 @@ const App: React.FC = () => {
         const revenueAccount = accounts.find(a => a.code === '4010')!; // Cafe Revenue
         const discountAccount = accounts.find(a => a.code === '5110')!; // Discounts
         const refundAccount = accounts.find(a => a.code === '5120')!; // Returns
-        const snappFoodAccount = accounts.find(a => a.code === '1030')!;
-        const tapsiFoodAccount = accounts.find(a => a.code === '1040')!;
-        const foodexAccount = accounts.find(a => a.code === '1050')!;
-        const employeeReceivableAccount = accounts.find(a => a.code === '1060')!;
-        const cashOnHandAccount = accounts.find(a => a.code === '1010')!; // Cash on Hand
+        const snappFoodAccount = accounts.find(a => a.code === '1030');
+        const tapsiFoodAccount = accounts.find(a => a.code === '1040');
+        const foodexAccount = accounts.find(a => a.code === '1050');
+        const employeeReceivableAccount = accounts.find(a => a.code === '1060');
+        const cashOnHandAccount = accounts.find(a => a.code === '1010'); // Cash on Hand
+
+        if (!snappFoodAccount || !tapsiFoodAccount || !foodexAccount || !employeeReceivableAccount || !cashOnHandAccount) {
+          toast.error('حساب‌های پیش‌فرض یافت نشدند. لطفاً صفحه را رفرش کنید تا حساب‌ها ایجاد شوند.');
+          return;
+        }
 
         // Determine Receiving Bank Account (POS/C2C)
         let bankAccount = accounts.find(a => a.code === '1020')!;

@@ -226,9 +226,28 @@ export const seedDatabase = async () => {
     const batch = writeBatch(db);
 
     // Check if data exists (simple check on accounts)
+    // Check if data exists (simple check on accounts)
     const accountsSnapshot = await getDocs(accountsRef);
+    const existingAccounts = accountsSnapshot.docs.map(doc => doc.data() as Account);
+    const existingCodes = new Set(existingAccounts.map(a => a.code));
+
+    let addedAccounts = false;
+    INITIAL_ACCOUNTS.forEach(acc => {
+        if (!existingCodes.has(acc.code)) {
+            const docRef = doc(accountsRef, acc.id);
+            batch.set(docRef, acc);
+            console.log(`Adding missing account: ${acc.name} (${acc.code})`);
+            addedAccounts = true;
+        }
+    });
+
     if (!accountsSnapshot.empty) {
-        console.log("Database already has data. Skipping seed.");
+        if (addedAccounts) {
+            await batch.commit();
+            console.log("Added missing accounts to existing database.");
+        } else {
+            console.log("Database already has data and all accounts. Skipping seed.");
+        }
         return;
     }
 
