@@ -293,6 +293,7 @@ const TransactionManager: React.FC = () => {
                                         </td>
                                         <td className="p-4 text-sm text-slate-700">
                                             {(t.description || t.details || t.employeeName || '-')}
+                                            {t.type === 'EXPENSE' && t.category && <span className="text-xs text-slate-500 block mt-1">دسته: {t.category}</span>}
                                             {t.type === 'INVENTORY' && t.itemName && <span className="text-xs text-slate-500 block mt-1">کالا: {t.itemName}</span>}
                                             {t.customerName && <span className="text-xs text-slate-400 block mt-1">{t.customerName}</span>}
                                         </td>
