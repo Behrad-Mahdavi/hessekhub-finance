@@ -1,6 +1,8 @@
+
 import React, { useState, useEffect } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
-import { Account, PurchaseRequest, SaleRecord, JournalEntry, RevenueStream, TransactionStatus, UserRole, JournalLine, SubscriptionStatus, AccountType, Employee, Customer, Subscription, PayrollPayment, Supplier, InventoryItem } from './types';
+import Transfers from './components/Transfers';
+import { Account, PurchaseRequest, SaleRecord, JournalEntry, RevenueStream, TransactionStatus, UserRole, JournalLine, SubscriptionStatus, AccountType, Employee, Customer, Subscription, PayrollPayment, Supplier, InventoryItem, TransferRecord } from './types';
 import { toPersianDate } from './utils';
 import Dashboard from './components/Dashboard';
 import Expenses from './components/Expenses';
@@ -11,7 +13,7 @@ import Payroll from './components/Payroll';
 import SubscriptionManager from './components/SubscriptionManager';
 import InventoryManager from './components/InventoryManager';
 import TransactionManager from './components/TransactionManager';
-import { LayoutDashboard, ShoppingCart, PieChart, Book, Settings as SettingsIcon, Shield, Menu, X, Wallet, Users, Lock, LogIn, Truck, Package, History } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, PieChart, Book, Settings as SettingsIcon, Shield, Menu, X, Wallet, Users, Lock, LogIn, Truck, Package, History, ArrowRightLeft } from 'lucide-react';
 
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
@@ -46,11 +48,13 @@ import {
   saveInventoryPurchase,
   registerInventoryUsage,
   addInventoryItem,
-  updateInventoryItem
+  updateInventoryItem,
+  addTransfer,
+  deleteTransferFull
 } from './services/firestore';
 import SupplierManager from './components/SupplierManager';
 
-type View = 'dashboard' | 'expenses' | 'sales' | 'ledger' | 'settings' | 'payroll' | 'subscriptions' | 'suppliers' | 'inventory' | 'transactions';
+type View = 'dashboard' | 'expenses' | 'sales' | 'ledger' | 'settings' | 'payroll' | 'subscriptions' | 'suppliers' | 'inventory' | 'transactions' | 'transfers';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('dashboard');
@@ -92,6 +96,7 @@ const App: React.FC = () => {
   const [payrollPayments, setPayrollPayments] = useState<PayrollPayment[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
+  const [transfers, setTransfers] = useState<TransferRecord[]>([]);
   const [useFirebase, setUseFirebase] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState<'checking' | 'connected' | 'error'>('checking');
   const [connectionError, setConnectionError] = useState<string>('');
@@ -190,6 +195,8 @@ const App: React.FC = () => {
       subscribeToCollection<Subscription>('subscriptions', setSubscriptions);
       subscribeToCollection<PayrollPayment>('payroll_payments', setPayrollPayments);
       subscribeToCollection<Supplier>('suppliers', setSuppliers);
+      subscribeToCollection<InventoryItem>('inventory_items', setInventoryItems);
+      subscribeToCollection<TransferRecord>('transfers', setTransfers);
 
       console.log('Subscriptions established');
       setUseFirebase(true);
@@ -266,6 +273,10 @@ const App: React.FC = () => {
       setInventoryItems(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as InventoryItem)));
     });
 
+    const unsubTransfers = onSnapshot(collection(db, 'transfers'), (snapshot) => {
+      setTransfers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TransferRecord)));
+    });
+
     return () => {
       unsubAccounts();
       unsubPurchases();
@@ -277,6 +288,7 @@ const App: React.FC = () => {
       unsubPayroll();
       unsubSuppliers();
       unsubInventory();
+      unsubTransfers();
     };
   }, [useFirebase]);
 
@@ -1194,6 +1206,70 @@ const App: React.FC = () => {
     }
   };
 
+  const handleAddTransfer = async (transfer: TransferRecord) => {
+    try {
+      const sourceAccount = accounts.find(a => a.id === transfer.fromAccountId);
+      const destAccount = accounts.find(a => a.id === transfer.toAccountId);
+
+      if (!sourceAccount || !destAccount) return;
+
+      if (useFirebase) {
+        // 1. Add Transfer Doc
+        await addTransfer(transfer);
+
+        // 2. Create Journal Entry
+        // Debit Dest (Increase Asset), Credit Source (Decrease Asset)
+        const journalEntry: JournalEntry = {
+          id: `JRN-${Date.now()}`,
+          date: transfer.date,
+          description: transfer.description,
+          referenceId: transfer.id,
+          lines: [
+            { accountId: destAccount.id, accountName: destAccount.name, debit: transfer.amount, credit: 0 },
+            { accountId: sourceAccount.id, accountName: sourceAccount.name, debit: 0, credit: transfer.amount }
+          ],
+          // createdAt: new Date() // Removed to match type definition
+        };
+        await addJournalEntry(journalEntry);
+
+        // 3. Update Account Balances
+        // Source: Decrease
+        await firestoreUpdateAccount(sourceAccount.id, { balance: sourceAccount.balance - transfer.amount });
+        // Dest: Increase
+        await firestoreUpdateAccount(destAccount.id, { balance: destAccount.balance + transfer.amount });
+
+        toast.success('انتقال با موفقیت ثبت شد');
+      } else {
+        // Local Fallback
+        setTransfers(prev => [transfer, ...prev]);
+        setAccounts(prev => prev.map(acc => {
+          if (acc.id === sourceAccount.id) return { ...acc, balance: acc.balance - transfer.amount };
+          if (acc.id === destAccount.id) return { ...acc, balance: acc.balance + transfer.amount };
+          return acc;
+        }));
+        toast.success('انتقال ثبت شد (محلی)');
+      }
+    } catch (error) {
+      console.error('Error adding transfer:', error);
+      toast.error('خطا در ثبت انتقال');
+    }
+  };
+
+  const handleDeleteTransfer = async (id: string) => {
+    try {
+      if (useFirebase) {
+        await deleteTransferFull(id);
+        toast.success('انتقال حذف شد و موجودی‌ها بازگشت');
+      } else {
+        // Local fallback not fully implemented for reversal
+        toast.error('حذف انتقال در حالت محلی پشتیبانی نمی‌شود');
+      }
+    } catch (error) {
+      console.error('Error deleting transfer:', error);
+      toast.error('خطا در حذف انتقال');
+    }
+  };
+
 
 
 
@@ -1206,6 +1282,7 @@ const App: React.FC = () => {
     { id: 'payroll', label: 'حقوق و دستمزد', icon: Wallet, view: 'payroll' },
     { id: 'ledger', label: 'دفتر کل', icon: Book, view: 'ledger' },
     { id: 'inventory', label: 'مدیریت انبار', icon: Package, view: 'inventory' },
+    { id: 'transfers', label: 'انتقال وجه', icon: ArrowRightLeft, view: 'transfers' },
     { id: 'transactions', label: 'مدیریت تراکنش‌ها', icon: History, view: 'transactions' },
     { id: 'settings', label: 'تنظیمات', icon: SettingsIcon, view: 'settings' },
   ];
@@ -1314,6 +1391,15 @@ const App: React.FC = () => {
             onAddItem={handleAddInventoryItem}
             onUpdateItem={handleUpdateInventoryItem}
             onRegisterUsage={handleRegisterUsage}
+          />
+        );
+      case 'transfers':
+        return (
+          <Transfers
+            accounts={accounts}
+            transfers={transfers}
+            onAddTransfer={handleAddTransfer}
+            onDeleteTransfer={handleDeleteTransfer}
           />
         );
       case 'transactions': // Added new case

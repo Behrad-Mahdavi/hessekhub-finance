@@ -113,6 +113,16 @@ export interface SaleRecord {
   employeeName?: string; // New: Name of employee for credit sales
 }
 
+export interface TransferRecord {
+  id: string;
+  fromAccountId: string;
+  toAccountId: string;
+  amount: number;
+  date: string;
+  description: string;
+  createdAt: Date;
+}
+
 export interface Customer {
   id: string;
   name: string;

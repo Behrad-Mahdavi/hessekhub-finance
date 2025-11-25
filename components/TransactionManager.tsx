@@ -11,15 +11,16 @@ import {
     deleteInventoryUsageFull,
     editSaleFull,
     editExpenseFull,
-    editPayrollFull
+    editPayrollFull,
+    deleteTransferFull
 } from '../services/firestore';
-import { SaleRecord, PurchaseRequest, PayrollPayment, InventoryTransaction, InventoryItem } from '../types';
+import { SaleRecord, PurchaseRequest, PayrollPayment, InventoryTransaction, InventoryItem, TransferRecord } from '../types';
 import { toPersianNumber, formatPrice, toEnglishDigits, toPersianDate, toPersianDigits } from '../utils';
 import { toast } from 'react-hot-toast';
 import PersianDatePicker from './PersianDatePicker';
 
 // Tabs
-type TabType = 'ALL' | 'SALES' | 'EXPENSES' | 'INVENTORY' | 'PAYROLL';
+type TabType = 'ALL' | 'SALES' | 'EXPENSES' | 'INVENTORY' | 'PAYROLL' | 'TRANSFERS';
 
 const TransactionManager: React.FC = () => {
     const [activeTab, setActiveTab] = useState<TabType>('ALL');
@@ -28,6 +29,7 @@ const TransactionManager: React.FC = () => {
     const [payroll, setPayroll] = useState<PayrollPayment[]>([]);
     const [inventory, setInventory] = useState<InventoryTransaction[]>([]);
     const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
+    const [transfers, setTransfers] = useState<TransferRecord[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
 
@@ -46,6 +48,7 @@ const TransactionManager: React.FC = () => {
         const unsubPayroll = subscribeToCollection<PayrollPayment>('payroll_payments', setPayroll);
         const unsubInventory = subscribeToCollection<InventoryTransaction>('inventory_transactions', setInventory);
         const unsubItems = subscribeToCollection<InventoryItem>('inventory_items', setInventoryItems);
+        const unsubTransfers = subscribeToCollection<TransferRecord>('transfers', setTransfers);
 
         return () => {
             unsubSales();
@@ -53,14 +56,15 @@ const TransactionManager: React.FC = () => {
             unsubPayroll();
             unsubInventory();
             unsubItems();
+            unsubTransfers();
         };
     }, []);
 
     useEffect(() => {
-        if (sales.length || expenses.length || payroll.length || inventory.length) {
+        if (sales.length || expenses.length || payroll.length || inventory.length || transfers.length) {
             setLoading(false);
         }
-    }, [sales, expenses, payroll, inventory]);
+    }, [sales, expenses, payroll, inventory, transfers]);
 
     // Normalize Data for Unified List
     const getAllTransactions = () => {
@@ -114,7 +118,8 @@ const TransactionManager: React.FC = () => {
             ...sales.map(s => normalize(s, 'SALE')),
             ...expenses.map(e => normalize(e, 'EXPENSE')),
             ...payroll.map(p => normalize(p, 'PAYROLL')),
-            ...inventory.map(i => normalize(i, 'INVENTORY'))
+            ...inventory.map(i => normalize(i, 'INVENTORY')),
+            ...transfers.map(t => normalize(t, 'TRANSFER'))
         ];
         return all.sort((a, b) => b.sortKey.localeCompare(a.sortKey));
     };
@@ -124,6 +129,7 @@ const TransactionManager: React.FC = () => {
         if (activeTab === 'EXPENSES' && t.type !== 'EXPENSE') return false;
         if (activeTab === 'PAYROLL' && t.type !== 'PAYROLL') return false;
         if (activeTab === 'INVENTORY' && t.type !== 'INVENTORY') return false;
+        if (activeTab === 'TRANSFERS' && t.type !== 'TRANSFER') return false;
 
         if (searchTerm) {
             const searchLower = searchTerm.toLowerCase();
@@ -204,6 +210,8 @@ const TransactionManager: React.FC = () => {
                 // If we delete the EXPENSE, we handle the inventory part in deleteExpenseFull.
                 // So here 'INVENTORY' type usually means USAGE or ADJUSTMENT.
                 await deleteInventoryUsageFull(transaction.id);
+            } else if (transaction.type === 'TRANSFER') {
+                await deleteTransferFull(transaction.id);
             }
             toast.success('تراکنش با موفقیت حذف شد و اثرات آن بازگردانده شد');
         } catch (error) {
@@ -218,6 +226,7 @@ const TransactionManager: React.FC = () => {
             case 'EXPENSE': return { text: 'هزینه/خرید', color: 'bg-red-100 text-red-800' };
             case 'PAYROLL': return { text: 'حقوق', color: 'bg-orange-100 text-orange-800' };
             case 'INVENTORY': return { text: 'انبار', color: 'bg-blue-100 text-blue-800' };
+            case 'TRANSFER': return { text: 'انتقال', color: 'bg-purple-100 text-purple-800' };
             default: return { text: type, color: 'bg-gray-100 text-gray-800' };
         }
     };
@@ -251,6 +260,7 @@ const TransactionManager: React.FC = () => {
                     { id: 'EXPENSES', label: 'هزینه‌ها' },
                     { id: 'PAYROLL', label: 'حقوق و دستمزد' },
                     { id: 'INVENTORY', label: 'تراکنش‌های انبار' },
+                    { id: 'TRANSFERS', label: 'انتقال وجه' },
                 ].map(tab => (
                     <button
                         key={tab.id}

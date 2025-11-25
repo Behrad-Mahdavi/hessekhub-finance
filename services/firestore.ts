@@ -617,3 +617,39 @@ export const checkFirebaseConnection = async () => {
     }
 };
 
+// --- Transfers ---
+const transfersRef = collection(db, 'transfers');
+
+export const addTransfer = async (transfer: any) => {
+    const { id, ...data } = transfer;
+    return await addDoc(transfersRef, cleanData(data));
+};
+
+export const deleteTransferFull = async (transferId: string) => {
+    const batch = writeBatch(db);
+
+    // 1. Fetch Transfer
+    const transferRef = doc(db, 'transfers', transferId);
+    const transferSnap = await getDoc(transferRef);
+    if (!transferSnap.exists()) throw new Error('Transfer not found');
+    // const transferData = transferSnap.data() as TransferRecord;
+
+    // 2. Delete Transfer Document
+    batch.delete(transferRef);
+
+    // 3. Revert Financials (Journal)
+    const journalDoc = await findRelatedJournalEntry(transferId);
+    if (journalDoc) {
+        const journalData = journalDoc.data() as JournalEntry;
+        for (const line of journalData.lines) {
+            const accountRef = doc(db, 'accounts', line.accountId);
+            // Reverse Journal Effects
+            if (line.debit > 0) batch.update(accountRef, { balance: increment(-line.debit) });
+            if (line.credit > 0) batch.update(accountRef, { balance: increment(-line.credit) });
+        }
+        batch.delete(journalDoc.ref);
+    }
+
+    await batch.commit();
+};
+
