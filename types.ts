@@ -151,6 +151,7 @@ export interface Employee {
   role: string;
   baseSalary: number;
   joinDate: string;
+  department?: 'STAFF' | 'COURIER'; // New field for separating staff and couriers
 }
 
 export interface PayrollPayment {

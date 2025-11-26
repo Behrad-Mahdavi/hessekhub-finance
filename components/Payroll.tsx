@@ -15,8 +15,9 @@ interface PayrollProps {
 
 const Payroll: React.FC<PayrollProps> = ({ employees, accounts, payrollPayments, onAddEmployee, onDeleteEmployee, onPaySalary }) => {
    const [isAdding, setIsAdding] = useState(false);
-   const [newEmp, setNewEmp] = useState({ fullName: '', role: '', baseSalary: '' });
+   const [newEmp, setNewEmp] = useState({ fullName: '', role: '', baseSalary: '', department: 'STAFF' as 'STAFF' | 'COURIER' });
    const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+   const [activeTab, setActiveTab] = useState<'STAFF' | 'COURIER'>('STAFF');
 
    const handleAdd = (e: React.FormEvent) => {
       e.preventDefault();
@@ -25,10 +26,11 @@ const Payroll: React.FC<PayrollProps> = ({ employees, accounts, payrollPayments,
          fullName: newEmp.fullName,
          role: newEmp.role,
          baseSalary: parseFloat(newEmp.baseSalary) || 0,
-         joinDate: new Date().toLocaleDateString('fa-IR')
+         joinDate: new Date().toLocaleDateString('fa-IR'),
+         department: newEmp.department
       });
       setIsAdding(false);
-      setNewEmp({ fullName: '', role: '', baseSalary: '' });
+      setNewEmp({ fullName: '', role: '', baseSalary: '', department: 'STAFF' });
    };
 
    return (
@@ -47,10 +49,52 @@ const Payroll: React.FC<PayrollProps> = ({ employees, accounts, payrollPayments,
             </button>
          </div>
 
+         {/* Tabs */}
+         <div className="flex gap-2 mb-6 border-b border-slate-200 pb-1">
+            <button
+               onClick={() => setActiveTab('STAFF')}
+               className={`px-4 py-2 font-bold text-sm transition-colors relative ${activeTab === 'STAFF' ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+               کارمندان
+               {activeTab === 'STAFF' && <div className="absolute bottom-[-5px] left-0 right-0 h-1 bg-indigo-600 rounded-t-full"></div>}
+            </button>
+            <button
+               onClick={() => setActiveTab('COURIER')}
+               className={`px-4 py-2 font-bold text-sm transition-colors relative ${activeTab === 'COURIER' ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+               پیک‌ها
+               {activeTab === 'COURIER' && <div className="absolute bottom-[-5px] left-0 right-0 h-1 bg-indigo-600 rounded-t-full"></div>}
+            </button>
+         </div>
+
          {isAdding && (
             <div className="bg-white p-6 rounded-2xl shadow-xl border border-slate-100 mb-8 animate-fade-in-down max-w-3xl">
-               <h3 className="text-lg font-bold mb-4">مشخصات کارمند جدید</h3>
-               <form onSubmit={handleAdd} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+               <h3 className="text-lg font-bold mb-4">مشخصات {activeTab === 'STAFF' ? 'کارمند' : 'پیک'} جدید</h3>
+               <form onSubmit={handleAdd} className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="md:col-span-4 mb-2">
+                     <div className="flex gap-4">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                           <input
+                              type="radio"
+                              name="department"
+                              checked={newEmp.department === 'STAFF'}
+                              onChange={() => setNewEmp({ ...newEmp, department: 'STAFF' })}
+                              className="w-4 h-4 text-indigo-600"
+                           />
+                           <span className="text-sm font-medium text-slate-700">کارمند اداری/کافه</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                           <input
+                              type="radio"
+                              name="department"
+                              checked={newEmp.department === 'COURIER'}
+                              onChange={() => setNewEmp({ ...newEmp, department: 'COURIER' })}
+                              className="w-4 h-4 text-indigo-600"
+                           />
+                           <span className="text-sm font-medium text-slate-700">پیک موتوری</span>
+                        </label>
+                     </div>
+                  </div>
                   <div>
                      <label className="block text-xs font-bold text-slate-500 mb-1">نام و نام خانوادگی</label>
                      <input
@@ -82,17 +126,17 @@ const Payroll: React.FC<PayrollProps> = ({ employees, accounts, payrollPayments,
                      />
                      {newEmp.baseSalary && <p className="text-xs text-indigo-600 mt-1 font-bold">{formatPrice(newEmp.baseSalary)}</p>}
                   </div>
-                  <div className="md:col-span-3 flex justify-end gap-2 mt-2">
+                  <div className="md:col-span-4 flex justify-end gap-2 mt-2">
                      <button type="button" onClick={() => setIsAdding(false)} className="px-4 py-2 text-slate-500">انصراف</button>
                      <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold">ذخیره</button>
-                     
+
                   </div>
                </form>
             </div>
          )}
 
          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {employees.map(emp => (
+            {employees.filter(e => (e.department || 'STAFF') === activeTab).map(emp => (
                <div key={emp.id} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 relative group">
                   <div className="flex justify-between items-start mb-4">
                      <div className="flex gap-3 items-center">

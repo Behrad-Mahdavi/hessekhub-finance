@@ -57,6 +57,12 @@ const SupplierManager: React.FC<SupplierManagerProps> = ({
         s.phoneNumber?.includes(searchTerm)
     );
 
+    // Find the up-to-date supplier object from the main list based on the selected ID
+    // This ensures that when a payment is made, the modal updates immediately
+    const activeSupplier = selectedSupplier
+        ? suppliers.find(s => s.id === selectedSupplier.id)
+        : null;
+
     return (
         <div className="p-4 md:p-8 pb-20">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-8">
@@ -158,7 +164,7 @@ const SupplierManager: React.FC<SupplierManagerProps> = ({
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full pl-4 pr-10 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm"
                 />
-                <Search className="absolute left-3 top-3.5 w-5 h-5 text-slate-400" />
+                <Search className="absolute right-3 top-3.5 w-5 h-5 text-slate-400" />
             </div>
 
             {/* Suppliers List */}
@@ -222,9 +228,9 @@ const SupplierManager: React.FC<SupplierManagerProps> = ({
             )}
 
             {/* Profile Modal */}
-            {selectedSupplier && (
+            {activeSupplier && (
                 <SupplierProfileModal
-                    supplier={selectedSupplier}
+                    supplier={activeSupplier}
                     purchases={purchases}
                     accounts={accounts}
                     onPayment={onPayment}

@@ -27,8 +27,13 @@ export const INITIAL_ACCOUNTS: Account[] = [
   { id: '504', code: '5040', name: 'هزینه اجاره', type: AccountType.EXPENSE, balance: 0 },
   { id: '505', code: '5050', name: 'هزینه حقوق و دستمزد', type: AccountType.EXPENSE, balance: 0 },
   { id: '506', code: '5060', name: 'بیمه', type: AccountType.EXPENSE, balance: 0 },
+  { id: '507', code: '5070', name: 'هزینه های بانکی', type: AccountType.EXPENSE, balance: 0 },
+  { id: '508', code: '5080', name: 'هزینه بهره پرداختی', type: AccountType.EXPENSE, balance: 0 },
+  { id: '509', code: '5090', name: 'هزینه متفرقه', type: AccountType.EXPENSE, balance: 0 },
   { id: '510', code: '5110', name: 'تخفیفات فروش', type: AccountType.EXPENSE, balance: 0 }, // Treated as Expense/Contra-Revenue
   { id: '511', code: '5120', name: 'برگشت از فروش', type: AccountType.EXPENSE, balance: 0 }, // Treated as Expense/Contra-Revenue
+  { id: '512', code: '5100', name: 'هزینه شارژ پیک ها', type: AccountType.EXPENSE, balance: 0 },
+  { id: '513', code: '5051', name: 'حقوق پیک ها', type: AccountType.EXPENSE, balance: 0 },
 ];
 
 export const MOCK_PURCHASES: PurchaseRequest[] = [

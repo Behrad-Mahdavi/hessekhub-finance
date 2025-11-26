@@ -359,6 +359,10 @@ const Expenses: React.FC<ExpensesProps> = ({
                   <option>بیمه</option>
                   <option>تعمیرات و نگهداری</option>
                   <option>تبلیغات و بازاریابی</option>
+                  <option>هزینه های بانکی</option>
+                  <option>هزینه بهره پرداختی</option>
+                  <option>هزینه متفرقه</option>
+                  <option>هزینه شارژ پیک ها</option>
                 </select>
                 <div className="absolute left-3 top-3.5 pointer-events-none text-slate-400">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>

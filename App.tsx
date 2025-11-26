@@ -180,25 +180,10 @@ const App: React.FC = () => {
       console.log('Database seeded');
 
       // Subscribe to all collections
-      // We need to handle unsubscriptions if we call this multiple times, 
-      // but for now let's assume the useEffect cleanup handles the previous mount's listeners.
-      // Actually, if we retry, we might duplicate listeners if we don't be careful.
-      // But since we are just setting state, it's okay for now.
-      // Ideally we should store unsub functions in refs.
+      // REMOVED: subscribeToCollection calls to prevent duplicates.
+      // Subscriptions are now handled exclusively by the useEffect hook below.
 
-      subscribeToCollection<Account>('accounts', setAccounts);
-      subscribeToCollection<PurchaseRequest>('purchases', setPurchases);
-      subscribeToCollection<SaleRecord>('sales', setSales);
-      subscribeToCollection<JournalEntry>('journals', setJournals);
-      subscribeToCollection<Employee>('employees', setEmployees);
-      subscribeToCollection<Customer>('customers', setCustomers);
-      subscribeToCollection<Subscription>('subscriptions', setSubscriptions);
-      subscribeToCollection<PayrollPayment>('payroll_payments', setPayrollPayments);
-      subscribeToCollection<Supplier>('suppliers', setSuppliers);
-      subscribeToCollection<InventoryItem>('inventory_items', setInventoryItems);
-      subscribeToCollection<TransferRecord>('transfers', setTransfers);
-
-      console.log('Subscriptions established');
+      console.log('Firebase initialized successfully');
       setUseFirebase(true);
       setIsLoading(false);
       toast.success('اتصال به سرور برقرار شد');
@@ -233,62 +218,59 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!useFirebase) return;
 
-    const unsubAccounts = onSnapshot(collection(db, 'accounts'), (snapshot) => {
+    // Define Unsubscribe functions array
+    const unsubs: (() => void)[] = [];
+
+    // Helper to add to unsubs list
+    const addSub = (unsub: () => void) => unsubs.push(unsub);
+
+    addSub(onSnapshot(collection(db, 'accounts'), (snapshot) => {
       setAccounts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account)));
-    });
+    }));
 
-    const unsubPurchases = onSnapshot(collection(db, 'purchases'), (snapshot) => {
+    addSub(onSnapshot(collection(db, 'purchases'), (snapshot) => {
       setPurchases(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PurchaseRequest)));
-    });
+    }));
 
-    const unsubSales = onSnapshot(collection(db, 'sales'), (snapshot) => {
+    addSub(onSnapshot(collection(db, 'sales'), (snapshot) => {
       setSales(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SaleRecord)));
-    });
+    }));
 
-    const unsubJournals = onSnapshot(collection(db, 'journals'), (snapshot) => {
+    addSub(onSnapshot(collection(db, 'journals'), (snapshot) => {
       setJournals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as JournalEntry)));
-    });
+    }));
 
-    const unsubEmployees = onSnapshot(collection(db, 'employees'), (snapshot) => {
+    addSub(onSnapshot(collection(db, 'employees'), (snapshot) => {
       setEmployees(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)));
-    });
+    }));
 
-    const unsubCustomers = onSnapshot(collection(db, 'customers'), (snapshot) => {
+    addSub(onSnapshot(collection(db, 'customers'), (snapshot) => {
       setCustomers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer)));
-    });
+    }));
 
-    const unsubSubscriptions = onSnapshot(collection(db, 'subscriptions'), (snapshot) => {
+    addSub(onSnapshot(collection(db, 'subscriptions'), (snapshot) => {
       setSubscriptions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subscription)));
-    });
+    }));
 
-    const unsubPayroll = onSnapshot(collection(db, 'payroll_payments'), (snapshot) => {
+    addSub(onSnapshot(collection(db, 'payroll_payments'), (snapshot) => {
       setPayrollPayments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PayrollPayment)));
-    });
+    }));
 
-    const unsubSuppliers = onSnapshot(collection(db, 'suppliers'), (snapshot) => {
+    addSub(onSnapshot(collection(db, 'suppliers'), (snapshot) => {
       setSuppliers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Supplier)));
-    });
+    }));
 
-    const unsubInventory = onSnapshot(collection(db, 'inventory_items'), (snapshot) => {
+    addSub(onSnapshot(collection(db, 'inventory_items'), (snapshot) => {
       setInventoryItems(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as InventoryItem)));
-    });
+    }));
 
-    const unsubTransfers = onSnapshot(collection(db, 'transfers'), (snapshot) => {
+    addSub(onSnapshot(collection(db, 'transfers'), (snapshot) => {
       setTransfers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TransferRecord)));
-    });
+    }));
 
+    // Cleanup function
     return () => {
-      unsubAccounts();
-      unsubPurchases();
-      unsubSales();
-      unsubJournals();
-      unsubEmployees();
-      unsubCustomers();
-      unsubSubscriptions();
-      unsubPayroll();
-      unsubSuppliers();
-      unsubInventory();
-      unsubTransfers();
+      unsubs.forEach(unsub => unsub());
     };
   }, [useFirebase]);
 
@@ -439,10 +421,7 @@ const App: React.FC = () => {
         const customer = customers.find(c => c.id === subscription.customerId);
         if (customer) {
           await firestoreUpdateCustomer(customer.id, { activeSubscriptionId: firestoreSubscriptionId });
-          // Update local state as well
-          setCustomers(prev => prev.map(c =>
-            c.id === subscription.customerId ? { ...c, activeSubscriptionId: firestoreSubscriptionId } : c
-          ));
+          // REMOVED: setCustomers(...) - Handled by snapshot listener
         }
 
         // Accounting Logic (similar to handleAddSale)
@@ -453,9 +432,7 @@ const App: React.FC = () => {
             await firestoreUpdateAccount(sale.paymentAccountId, {
               balance: paymentAccount.balance + sale.amount
             });
-            setAccounts(prev => prev.map(a =>
-              a.id === sale.paymentAccountId ? { ...a, balance: a.balance + sale.amount } : a
-            ));
+            // REMOVED: setAccounts(...) - Handled by snapshot listener
           }
 
           // Credit Revenue (find or use subscription revenue account)
@@ -464,9 +441,7 @@ const App: React.FC = () => {
             await firestoreUpdateAccount(subscriptionRevenueAccount.id, {
               balance: subscriptionRevenueAccount.balance + sale.amount
             });
-            setAccounts(prev => prev.map(a =>
-              a.id === subscriptionRevenueAccount.id ? { ...a, balance: a.balance + sale.amount } : a
-            ));
+            // REMOVED: setAccounts(...) - Handled by snapshot listener
           }
 
           // Create Journal Entry
@@ -491,7 +466,7 @@ const App: React.FC = () => {
           };
 
           await firestoreAddJournal(journal);
-          setJournals(prev => [journal, ...prev]);
+          // REMOVED: setJournals(...) - Handled by snapshot listener
         }
 
         toast.success('اشتراک با موفقیت ثبت شد');
@@ -523,11 +498,14 @@ const App: React.FC = () => {
           await firestoreUpdateAccount(payment.paymentAccountId, {
             balance: paymentAccount.balance - payment.totalAmount
           });
-          // setAccounts handled by subscription
+          // REMOVED: setAccounts(...) - Handled by snapshot listener
         }
 
         // 3. Create Journal Entry
-        const salaryExpenseAccount = accounts.find(a => a.code === '5050'); // Salary Expense
+        const employee = employees.find(e => e.id === payment.employeeId);
+        const isCourier = employee?.department === 'COURIER' || employee?.role === 'پیک' || employee?.role === 'پیک موتوری';
+        const expenseCode = isCourier ? '5051' : '5050';
+        const salaryExpenseAccount = accounts.find(a => a.code === expenseCode); // 5050: Staff, 5051: Courier
 
         if (salaryExpenseAccount) {
           // Update Salary Expense Account Balance (Debit = Increase Expense)
@@ -557,7 +535,7 @@ const App: React.FC = () => {
         };
 
         await firestoreAddJournal(newJournal);
-        // setJournals handled by subscription
+        // REMOVED: setJournals(...) - Handled by snapshot listener
 
         toast.success('حقوق با موفقیت پرداخت شد');
 
@@ -576,14 +554,25 @@ const App: React.FC = () => {
           return { ...acc, balance: acc.balance - payment.totalAmount };
         }
         // Debit Salary Expense Account (Expense)
-        if (acc.code === '5050') {
-          return { ...acc, balance: acc.balance + payment.totalAmount };
+        if (acc.code === '5050' || acc.code === '5051') {
+          // We need to know WHICH one to update.
+          // Simplified local update: just update if it matches the target code
+          const employee = employees.find(e => e.id === payment.employeeId);
+          const isCourier = employee?.department === 'COURIER' || employee?.role === 'پیک' || employee?.role === 'پیک موتوری';
+          const targetCode = isCourier ? '5051' : '5050';
+
+          if (acc.code === targetCode) {
+            return { ...acc, balance: acc.balance + payment.totalAmount };
+          }
         }
         return acc;
       }));
 
       // Add Journal Entry Locally
-      const salaryExpenseAccount = accounts.find(a => a.code === '5050');
+      const employee = employees.find(e => e.id === payment.employeeId);
+      const isCourier = employee?.department === 'COURIER' || employee?.role === 'پیک' || employee?.role === 'پیک موتوری';
+      const expenseCode = isCourier ? '5051' : '5050';
+      const salaryExpenseAccount = accounts.find(a => a.code === expenseCode);
       const newJournal: JournalEntry = {
         id: `JRN-${Math.floor(Math.random() * 100000)}`,
         date: payment.date,
@@ -790,22 +779,32 @@ const App: React.FC = () => {
 
     try {
       // 2. Create Journal Entry (Debit Expense, Credit Asset)
-      const expenseAccount = accounts.find(a => a.name === purchase.category) || accounts.find(a => a.type === AccountType.EXPENSE)!;
+      const expenseAccount = accounts.find(a => a.name === purchase.category) || accounts.find(a => a.type === AccountType.EXPENSE);
+
+      if (!expenseAccount) {
+        toast.error('حساب هزینه یافت نشد');
+        return;
+      }
 
       // 2. Determine Credit Account (Source of funds or Liability)
-      let creditAccount: Account;
+      let creditAccount: Account | undefined;
 
       if (purchase.isCredit) {
         // If Credit Purchase -> Accounts Payable (2010)
-        creditAccount = accounts.find(a => a.code === '2010') || accounts.find(a => a.type === AccountType.LIABILITY)!;
+        creditAccount = accounts.find(a => a.code === '2010') || accounts.find(a => a.type === AccountType.LIABILITY);
       } else {
         // If Cash Purchase -> Asset Account (Bank/Cash)
         if (purchase.paymentAccountId) {
           const selected = accounts.find(a => a.id === purchase.paymentAccountId);
-          creditAccount = selected || accounts.find(a => a.type === AccountType.ASSET)!;
+          creditAccount = selected || accounts.find(a => a.type === AccountType.ASSET);
         } else {
-          creditAccount = accounts.find(a => a.type === AccountType.ASSET && (a.code === '1020' || a.name.includes('بانک'))) || accounts.find(a => a.type === AccountType.ASSET)!;
+          creditAccount = accounts.find(a => a.type === AccountType.ASSET && (a.code === '1020' || a.name.includes('بانک'))) || accounts.find(a => a.type === AccountType.ASSET);
         }
+      }
+
+      if (!creditAccount) {
+        toast.error('حساب بستانکار (بانک یا پرداختنی) یافت نشد');
+        return;
       }
 
       const journalEntry: JournalEntry = {
@@ -916,30 +915,45 @@ const App: React.FC = () => {
 
   const handleAddSale = async (sale: SaleRecord) => {
     try {
-      const cashAccount = accounts.find(a => a.code === '1010') || accounts.find(a => a.type === AccountType.ASSET)!;
+      const cashAccount = accounts.find(a => a.code === '1010') || accounts.find(a => a.type === AccountType.ASSET);
+
+      if (!cashAccount) {
+        toast.error('حساب صندوق یافت نشد');
+        return;
+      }
+
       const newLines: JournalLine[] = [];
 
       // Logic for Cafe Split Sales (Compound Entry)
       if (sale.stream === RevenueStream.CAFE && sale.grossAmount) {
-        const revenueAccount = accounts.find(a => a.code === '4010')!; // Cafe Revenue
-        const discountAccount = accounts.find(a => a.code === '5110')!; // Discounts
-        const refundAccount = accounts.find(a => a.code === '5120')!; // Returns
+        const revenueAccount = accounts.find(a => a.code === '4010'); // Cafe Revenue
+        const discountAccount = accounts.find(a => a.code === '5110'); // Discounts
+        const refundAccount = accounts.find(a => a.code === '5120'); // Returns
         const snappFoodAccount = accounts.find(a => a.code === '1030');
         const tapsiFoodAccount = accounts.find(a => a.code === '1040');
         const foodexAccount = accounts.find(a => a.code === '1050');
         const employeeReceivableAccount = accounts.find(a => a.code === '1060');
         const cashOnHandAccount = accounts.find(a => a.code === '1010'); // Cash on Hand
 
-        if (!snappFoodAccount || !tapsiFoodAccount || !foodexAccount || !employeeReceivableAccount || !cashOnHandAccount) {
+        if (!revenueAccount || !discountAccount || !refundAccount || !snappFoodAccount || !tapsiFoodAccount || !foodexAccount || !employeeReceivableAccount || !cashOnHandAccount) {
           toast.error('حساب‌های پیش‌فرض یافت نشدند. لطفاً صفحه را رفرش کنید تا حساب‌ها ایجاد شوند.');
           return;
         }
 
         // Determine Receiving Bank Account (POS/C2C)
-        let bankAccount = accounts.find(a => a.code === '1020')!;
+        let bankAccount = accounts.find(a => a.code === '1020');
         if (sale.paymentAccountId) {
           const selected = accounts.find(a => a.id === sale.paymentAccountId);
           if (selected) bankAccount = selected;
+        }
+
+        if (!bankAccount) {
+          bankAccount = accounts.find(a => a.type === AccountType.ASSET);
+        }
+
+        if (!bankAccount) {
+          toast.error('حساب بانکی یافت نشد');
+          return;
         }
 
         // Calculate Split Amounts
@@ -1070,7 +1084,12 @@ const App: React.FC = () => {
           creditAccountCode = '4030'; // Assessment Revenue
         }
 
-        const creditAccount = accounts.find(a => a.code === creditAccountCode)!;
+        const creditAccount = accounts.find(a => a.code === creditAccountCode);
+
+        if (!creditAccount) {
+          toast.error(`حساب درآمد مربوطه (${creditAccountCode}) یافت نشد`);
+          return;
+        }
 
         newLines.push({ accountId: cashAccount.id, accountName: cashAccount.name, debit: sale.amount, credit: 0 });
         newLines.push({ accountId: creditAccount.id, accountName: creditAccount.name, debit: 0, credit: sale.amount });
