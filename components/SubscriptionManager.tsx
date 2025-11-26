@@ -70,16 +70,24 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
                 : subscriptions.find(s => s.customerId === customer.id && s.status === 'ACTIVE');
 
             if (!activeSub) {
-                console.log(`Customer ${customer.name} has no active subscription (activeSubId: ${customer.activeSubscriptionId})`);
                 return null;
             }
 
             // Check if today is within subscription range
             const inRange = activeSub.startDate <= todayPersian && activeSub.endDate >= todayPersian;
-            console.log(`Customer ${customer.name}: Sub ${activeSub.planName} (${activeSub.startDate} to ${activeSub.endDate}) - In Range: ${inRange}`);
 
             if (inRange) {
-                return { sub: activeSub, customer };
+                // *** اصلاحیه: محاسبه پویا روزهای مانده ***
+                // محاسبه روزهای کاری از "امروز" تا "تاریخ پایان اشتراک"
+                const currentRemainingDays = calculateDeliveryDays(todayPersian, activeSub.endDate);
+
+                // ایجاد یک کپی از اشتراک با مقدار اصلاح شده برای نمایش
+                const displaySub = {
+                    ...activeSub,
+                    remainingDays: currentRemainingDays
+                };
+
+                return { sub: displaySub, customer };
             }
             return null;
         })
