@@ -13,7 +13,8 @@ import Payroll from './components/Payroll';
 import SubscriptionManager from './components/SubscriptionManager';
 import InventoryManager from './components/InventoryManager';
 import TransactionManager from './components/TransactionManager';
-import { LayoutDashboard, ShoppingCart, PieChart, Book, Settings as SettingsIcon, Shield, Menu, X, Wallet, Users, Lock, LogIn, Truck, Package, History, ArrowRightLeft } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, PieChart, Book, Settings as SettingsIcon, Shield, Menu, X, Wallet, Users, Lock, LogIn, Truck, Package, History, ArrowRightLeft, LineChart, CreditCard, Home } from 'lucide-react';
+import Analytics from './components/Analytics';
 
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
@@ -55,7 +56,7 @@ import {
 } from './services/firestore';
 import SupplierManager from './components/SupplierManager';
 
-type View = 'dashboard' | 'expenses' | 'sales' | 'ledger' | 'settings' | 'payroll' | 'subscriptions' | 'suppliers' | 'inventory' | 'transactions' | 'transfers';
+type View = 'dashboard' | 'expenses' | 'sales' | 'ledger' | 'settings' | 'payroll' | 'subscriptions' | 'suppliers' | 'inventory' | 'transactions' | 'transfers' | 'analytics';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('dashboard');
@@ -180,7 +181,6 @@ const App: React.FC = () => {
       await seedDatabase();
       console.log('Database seeded');
 
-      // Subscribe to all collections
       // REMOVED: subscribeToCollection calls to prevent duplicates.
       // Subscriptions are now handled exclusively by the useEffect hook below.
 
@@ -1373,7 +1373,13 @@ const App: React.FC = () => {
     }
   };
 
-
+  // Placeholder for TransactionManager update/delete functions
+  const handleUpdateSale = async (id: string, data: Partial<SaleRecord>) => { /* ... */ };
+  const handleDeletePayroll = async (id: string) => { /* ... */ };
+  const handleDeleteInventoryPurchase = async (id: string) => { /* ... */ };
+  const handleUpdatePurchase = async (id: string, data: Partial<PurchaseRequest>) => { /* ... */ };
+  const handleUpdatePayroll = async (id: string, data: Partial<PayrollPayment>) => { /* ... */ };
+  const handleUpdateInventoryPurchase = async (id: string, data: Partial<PurchaseRequest>) => { /* ... */ };
 
 
   const navItems = [
@@ -1386,6 +1392,7 @@ const App: React.FC = () => {
     { id: 'ledger', label: 'دفتر کل', icon: Book, view: 'ledger' },
     { id: 'inventory', label: 'مدیریت انبار', icon: Package, view: 'inventory' },
     { id: 'transfers', label: 'انتقال وجه', icon: ArrowRightLeft, view: 'transfers' },
+    { id: 'analytics', label: 'گزارش و تحلیل', icon: LineChart, view: 'analytics' },
     { id: 'transactions', label: 'مدیریت تراکنش‌ها', icon: History, view: 'transactions' },
     { id: 'settings', label: 'تنظیمات', icon: SettingsIcon, view: 'settings' },
   ];
@@ -1516,6 +1523,16 @@ const App: React.FC = () => {
             payrollPayments={payrollPayments}
             journals={journals}
             accounts={accounts}
+          />
+        );
+      case 'analytics':
+        return (
+          <Analytics
+            sales={sales}
+            purchases={purchases}
+            customers={customers}
+            suppliers={suppliers}
+            subscriptions={subscriptions}
           />
         );
       default:
