@@ -15,7 +15,7 @@ import {
     getDoc
 } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Account, PurchaseRequest, SaleRecord, JournalEntry, Employee, Customer, Subscription } from '../types';
+import { Account, PurchaseRequest, SaleRecord, JournalEntry, Employee, Customer, Subscription, TransferRecord } from '../types';
 import { INITIAL_ACCOUNTS, MOCK_PURCHASES, MOCK_SALES, INITIAL_JOURNALS, INITIAL_EMPLOYEES } from '../constants';
 
 // Collection References
@@ -549,6 +549,11 @@ export const addEmployee = async (employee: Employee) => {
     return await addDoc(employeesRef, cleanData(data));
 };
 
+export const updateEmployee = async (id: string, data: Partial<Employee>) => {
+    const docRef = doc(db, 'employees', id);
+    await updateDoc(docRef, cleanData(data));
+};
+
 export const deleteEmployee = async (id: string) => {
     const docRef = doc(db, 'employees', id);
     await deleteDoc(docRef);
@@ -632,7 +637,7 @@ export const deleteTransferFull = async (transferId: string) => {
     const transferRef = doc(db, 'transfers', transferId);
     const transferSnap = await getDoc(transferRef);
     if (!transferSnap.exists()) throw new Error('Transfer not found');
-    // const transferData = transferSnap.data() as TransferRecord;
+    const transferData = transferSnap.data() as TransferRecord;
 
     // 2. Delete Transfer Document
     batch.delete(transferRef);
@@ -643,11 +648,69 @@ export const deleteTransferFull = async (transferId: string) => {
         const journalData = journalDoc.data() as JournalEntry;
         for (const line of journalData.lines) {
             const accountRef = doc(db, 'accounts', line.accountId);
-            // Reverse Journal Effects
             if (line.debit > 0) batch.update(accountRef, { balance: increment(-line.debit) });
             if (line.credit > 0) batch.update(accountRef, { balance: increment(-line.credit) });
         }
         batch.delete(journalDoc.ref);
+    }
+
+    // 4. Revert Person Balances
+    // Source (Credit was applied, so Debit to reverse -> Increase Asset-like / Decrease Liability-like)
+    // Actually, simpler: Just do the opposite of what addTransfer did.
+    // If Source was Person: We Credited them (Decreased Asset-like / Increased Liability-like).
+    // To Reverse: Debit them (Increase Asset-like / Decrease Liability-like).
+
+    // Logic:
+    // Customer (Asset-like): Credit = Decrease. Reverse = Increase (+).
+    // Supplier (Liability-like): Credit = Increase. Reverse = Decrease (-).
+    // Employee (Net Asset): Credit = Decrease. Reverse = Increase (+).
+
+    if (transferData.fromPersonId) {
+        // We need to know the type of person. But ID usually tells us? 
+        // Or we check all collections? Or we rely on the fact that we don't know the type easily without querying.
+        // Optimization: Try to update all? No.
+        // Better: We should store personType in TransferRecord? 
+        // For now, let's try to find them. Or assume ID format?
+        // CUST-, SUP-, EMP- prefixes are used in App.tsx generation but maybe not enforced?
+        // Let's assume prefixes or check collections.
+        // Actually, we can just try to getDoc from all 3? Expensive.
+        // Let's rely on ID prefixes if possible, or just try-catch updates?
+        // "CUST-", "SUP-", "EMP-" are standard here.
+
+        const pid = transferData.fromPersonId;
+        const amount = transferData.amount;
+
+        if (pid.startsWith('CUST')) {
+            const ref = doc(db, 'customers', pid);
+            batch.update(ref, { balance: increment(amount) }); // Reverse Credit (Decrease) -> Increase
+        } else if (pid.startsWith('SUP')) {
+            const ref = doc(db, 'suppliers', pid);
+            batch.update(ref, { balance: increment(-amount) }); // Reverse Credit (Increase) -> Decrease
+        } else if (pid.startsWith('EMP')) {
+            const ref = doc(db, 'employees', pid);
+            batch.update(ref, { balance: increment(amount) }); // Reverse Credit (Decrease) -> Increase
+        }
+    }
+
+    if (transferData.toPersonId) {
+        // Dest was Debited.
+        // Customer (Asset-like): Debit = Increase. Reverse = Decrease (-).
+        // Supplier (Liability-like): Debit = Decrease. Reverse = Increase (+).
+        // Employee (Net Asset): Debit = Increase. Reverse = Decrease (-).
+
+        const pid = transferData.toPersonId;
+        const amount = transferData.amount;
+
+        if (pid.startsWith('CUST')) {
+            const ref = doc(db, 'customers', pid);
+            batch.update(ref, { balance: increment(-amount) });
+        } else if (pid.startsWith('SUP')) {
+            const ref = doc(db, 'suppliers', pid);
+            batch.update(ref, { balance: increment(amount) });
+        } else if (pid.startsWith('EMP')) {
+            const ref = doc(db, 'employees', pid);
+            batch.update(ref, { balance: increment(-amount) });
+        }
     }
 
     await batch.commit();

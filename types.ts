@@ -113,10 +113,20 @@ export interface SaleRecord {
   employeeName?: string; // New: Name of employee for credit sales
 }
 
+export enum TransferType {
+  ACCOUNT_TO_ACCOUNT = 'ACCOUNT_TO_ACCOUNT',
+  PERSON_TO_PERSON = 'PERSON_TO_PERSON',
+  PERSON_TO_BANK = 'PERSON_TO_BANK',
+  BANK_TO_PERSON = 'BANK_TO_PERSON'
+}
+
 export interface TransferRecord {
   id: string;
-  fromAccountId: string;
-  toAccountId: string;
+  type: TransferType;
+  fromAccountId?: string; // For Account source
+  toAccountId?: string;   // For Account dest
+  fromPersonId?: string;  // For Person source
+  toPersonId?: string;    // For Person dest
   amount: number;
   date: string;
   description: string;
@@ -152,6 +162,7 @@ export interface Employee {
   baseSalary: number;
   joinDate: string;
   department?: 'STAFF' | 'COURIER'; // New field for separating staff and couriers
+  balance?: number; // Positive = Receivable (Advance), Negative = Payable (Salary Due)
 }
 
 export interface PayrollPayment {

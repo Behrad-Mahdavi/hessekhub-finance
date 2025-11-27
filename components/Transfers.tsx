@@ -1,20 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { Account, AccountType, TransferRecord } from '../types';
+import { Account, AccountType, TransferRecord, TransferType, Customer, Supplier, Employee } from '../types';
 import { toPersianDate, formatPrice } from '../utils';
-import { ArrowRightLeft, Wallet, Building2, Calendar, FileText, CheckCircle, AlertCircle, ArrowRight, History, Trash2 } from 'lucide-react';
+import { ArrowRightLeft, Wallet, Building2, Calendar, FileText, CheckCircle, AlertCircle, ArrowRight, History, Trash2, User, Users } from 'lucide-react';
 import toast from 'react-hot-toast';
 import PersianDatePicker from './PersianDatePicker';
 
 interface TransfersProps {
     accounts: Account[];
     transfers: TransferRecord[];
+    customers: Customer[];
+    suppliers: Supplier[];
+    employees: Employee[];
     onAddTransfer: (transfer: TransferRecord) => void;
     onDeleteTransfer: (id: string) => void;
 }
 
-const Transfers: React.FC<TransfersProps> = ({ accounts, transfers, onAddTransfer, onDeleteTransfer }) => {
+const Transfers: React.FC<TransfersProps> = ({ accounts, transfers, customers, suppliers, employees, onAddTransfer, onDeleteTransfer }) => {
+    const [transferType, setTransferType] = useState<TransferType>(TransferType.ACCOUNT_TO_ACCOUNT);
     const [fromAccountId, setFromAccountId] = useState('');
     const [toAccountId, setToAccountId] = useState('');
+    const [fromPersonId, setFromPersonId] = useState('');
+    const [toPersonId, setToPersonId] = useState('');
     const [amount, setAmount] = useState('');
     const [description, setDescription] = useState('');
     const [date, setDate] = useState(toPersianDate(new Date()));
@@ -22,17 +28,29 @@ const Transfers: React.FC<TransfersProps> = ({ accounts, transfers, onAddTransfe
     // Filter accounts: Only Assets (Cash, Bank, etc.) usually participate in transfers
     const assetAccounts = accounts.filter(a => a.type === AccountType.ASSET);
 
+    // Combine all people for selection
+    const allPeople = [
+        ...customers.map(c => ({ id: c.id, name: c.name, type: 'مشتری' })),
+        ...suppliers.map(s => ({ id: s.id, name: s.name, type: 'تامین‌کننده' })),
+        ...employees.map(e => ({ id: e.id, name: e.fullName, type: 'پرسنل' }))
+    ];
+
+    const getPersonName = (id: string) => allPeople.find(p => p.id === id)?.name || 'ناشناس';
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (!fromAccountId || !toAccountId) {
-            toast.error('لطفاً حساب مبدأ و مقصد را انتخاب کنید');
-            return;
-        }
-
-        if (fromAccountId === toAccountId) {
-            toast.error('حساب مبدأ و مقصد نمی‌توانند یکسان باشند');
-            return;
+        // Validation based on type
+        if (transferType === TransferType.ACCOUNT_TO_ACCOUNT) {
+            if (!fromAccountId || !toAccountId) { toast.error('لطفاً حساب مبدأ و مقصد را انتخاب کنید'); return; }
+            if (fromAccountId === toAccountId) { toast.error('حساب مبدأ و مقصد نمی‌توانند یکسان باشند'); return; }
+        } else if (transferType === TransferType.PERSON_TO_PERSON) {
+            if (!fromPersonId || !toPersonId) { toast.error('لطفاً شخص مبدأ و مقصد را انتخاب کنید'); return; }
+            if (fromPersonId === toPersonId) { toast.error('شخص مبدأ و مقصد نمی‌توانند یکسان باشند'); return; }
+        } else if (transferType === TransferType.PERSON_TO_BANK) {
+            if (!fromPersonId || !toAccountId) { toast.error('لطفاً شخص و حساب مقصد را انتخاب کنید'); return; }
+        } else if (transferType === TransferType.BANK_TO_PERSON) {
+            if (!fromAccountId || !toPersonId) { toast.error('لطفاً حساب مبدأ و شخص را انتخاب کنید'); return; }
         }
 
         const numAmount = parseFloat(amount);
@@ -41,23 +59,37 @@ const Transfers: React.FC<TransfersProps> = ({ accounts, transfers, onAddTransfe
             return;
         }
 
-        const sourceAccount = accounts.find(a => a.id === fromAccountId);
-        const destAccount = accounts.find(a => a.id === toAccountId);
-
-        if (!sourceAccount || !destAccount) return;
-
-        // Check balance (optional, but good practice)
-        if (sourceAccount.balance < numAmount) {
-            toast('موجودی حساب مبدأ کمتر از مبلغ انتقال است، اما انتقال انجام می‌شود.', { icon: '⚠️' });
+        let desc = description;
+        if (!desc) {
+            if (transferType === TransferType.ACCOUNT_TO_ACCOUNT) {
+                const source = accounts.find(a => a.id === fromAccountId)?.name;
+                const dest = accounts.find(a => a.id === toAccountId)?.name;
+                desc = `انتقال از ${source} به ${dest}`;
+            } else if (transferType === TransferType.PERSON_TO_PERSON) {
+                const source = getPersonName(fromPersonId);
+                const dest = getPersonName(toPersonId);
+                desc = `انتقال از ${source} به ${dest}`;
+            } else if (transferType === TransferType.PERSON_TO_BANK) {
+                const source = getPersonName(fromPersonId);
+                const dest = accounts.find(a => a.id === toAccountId)?.name;
+                desc = `واریز توسط ${source} به ${dest}`;
+            } else if (transferType === TransferType.BANK_TO_PERSON) {
+                const source = accounts.find(a => a.id === fromAccountId)?.name;
+                const dest = getPersonName(toPersonId);
+                desc = `پرداخت از ${source} به ${dest}`;
+            }
         }
 
         const newTransfer: TransferRecord = {
             id: `TRF-${Date.now()}`,
-            fromAccountId,
-            toAccountId,
+            type: transferType,
+            fromAccountId: (transferType === TransferType.ACCOUNT_TO_ACCOUNT || transferType === TransferType.BANK_TO_PERSON) ? fromAccountId : undefined,
+            toAccountId: (transferType === TransferType.ACCOUNT_TO_ACCOUNT || transferType === TransferType.PERSON_TO_BANK) ? toAccountId : undefined,
+            fromPersonId: (transferType === TransferType.PERSON_TO_PERSON || transferType === TransferType.PERSON_TO_BANK) ? fromPersonId : undefined,
+            toPersonId: (transferType === TransferType.PERSON_TO_PERSON || transferType === TransferType.BANK_TO_PERSON) ? toPersonId : undefined,
             amount: numAmount,
             date,
-            description: description || `انتقال از ${sourceAccount.name} به ${destAccount.name}`,
+            description: desc,
             createdAt: new Date()
         };
 
@@ -66,9 +98,6 @@ const Transfers: React.FC<TransfersProps> = ({ accounts, transfers, onAddTransfe
         // Reset form
         setAmount('');
         setDescription('');
-        // Keep accounts selected for easier sequential transfers? Or reset? Let's reset for safety.
-        // setFromAccountId('');
-        // setToAccountId('');
         toast.success('انتقال با موفقیت انجام شد');
     };
 
@@ -92,23 +121,71 @@ const Transfers: React.FC<TransfersProps> = ({ accounts, transfers, onAddTransfe
                     </h3>
 
                     <form onSubmit={handleSubmit} className="space-y-6">
+                        {/* Type Selector */}
+                        <div className="grid grid-cols-2 gap-2 mb-4">
+                            <button
+                                type="button"
+                                onClick={() => setTransferType(TransferType.ACCOUNT_TO_ACCOUNT)}
+                                className={`p-2 text-xs font-bold rounded-lg border ${transferType === TransferType.ACCOUNT_TO_ACCOUNT ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-white text-slate-500 border-slate-200'}`}
+                            >
+                                حساب به حساب
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setTransferType(TransferType.PERSON_TO_PERSON)}
+                                className={`p-2 text-xs font-bold rounded-lg border ${transferType === TransferType.PERSON_TO_PERSON ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-white text-slate-500 border-slate-200'}`}
+                            >
+                                شخص به شخص
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setTransferType(TransferType.PERSON_TO_BANK)}
+                                className={`p-2 text-xs font-bold rounded-lg border ${transferType === TransferType.PERSON_TO_BANK ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-white text-slate-500 border-slate-200'}`}
+                            >
+                                شخص به بانک
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setTransferType(TransferType.BANK_TO_PERSON)}
+                                className={`p-2 text-xs font-bold rounded-lg border ${transferType === TransferType.BANK_TO_PERSON ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-white text-slate-500 border-slate-200'}`}
+                            >
+                                بانک به شخص
+                            </button>
+                        </div>
+
                         {/* Source & Dest */}
                         <div className="space-y-4 relative">
+                            {/* Source Field */}
                             <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">حساب مبدأ (برداشت)</label>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
+                                    {(transferType === TransferType.ACCOUNT_TO_ACCOUNT || transferType === TransferType.BANK_TO_PERSON) ? 'حساب مبدأ (برداشت)' : 'شخص مبدأ (پرداخت کننده)'}
+                                </label>
                                 <div className="relative">
-                                    <select
-                                        value={fromAccountId}
-                                        onChange={(e) => setFromAccountId(e.target.value)}
-                                        className="w-full p-3 pl-10 bg-rose-50 border border-rose-100 rounded-xl focus:ring-2 focus:ring-rose-500 outline-none appearance-none text-slate-700 font-medium transition-all"
-                                    >
-                                        <option value="">انتخاب کنید...</option>
-                                        {assetAccounts.map(acc => (
-                                            <option key={acc.id} value={acc.id}>{acc.name} ({formatPrice(acc.balance)})</option>
-                                        ))}
-                                    </select>
+                                    {(transferType === TransferType.ACCOUNT_TO_ACCOUNT || transferType === TransferType.BANK_TO_PERSON) ? (
+                                        <select
+                                            value={fromAccountId}
+                                            onChange={(e) => setFromAccountId(e.target.value)}
+                                            className="w-full p-3 pl-10 bg-rose-50 border border-rose-100 rounded-xl focus:ring-2 focus:ring-rose-500 outline-none appearance-none text-slate-700 font-medium transition-all"
+                                        >
+                                            <option value="">انتخاب حساب...</option>
+                                            {assetAccounts.map(acc => (
+                                                <option key={acc.id} value={acc.id}>{acc.name} ({formatPrice(acc.balance)})</option>
+                                            ))}
+                                        </select>
+                                    ) : (
+                                        <select
+                                            value={fromPersonId}
+                                            onChange={(e) => setFromPersonId(e.target.value)}
+                                            className="w-full p-3 pl-10 bg-rose-50 border border-rose-100 rounded-xl focus:ring-2 focus:ring-rose-500 outline-none appearance-none text-slate-700 font-medium transition-all"
+                                        >
+                                            <option value="">انتخاب شخص...</option>
+                                            {allPeople.map(p => (
+                                                <option key={p.id} value={p.id}>{p.name} ({p.type})</option>
+                                            ))}
+                                        </select>
+                                    )}
                                     <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                                        <Wallet className="w-4 h-4 text-rose-400" />
+                                        {(transferType === TransferType.ACCOUNT_TO_ACCOUNT || transferType === TransferType.BANK_TO_PERSON) ? <Wallet className="w-4 h-4 text-rose-400" /> : <User className="w-4 h-4 text-rose-400" />}
                                     </div>
                                 </div>
                             </div>
@@ -120,21 +197,37 @@ const Transfers: React.FC<TransfersProps> = ({ accounts, transfers, onAddTransfe
                                 </div>
                             </div>
 
+                            {/* Dest Field */}
                             <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">حساب مقصد (واریز)</label>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
+                                    {(transferType === TransferType.ACCOUNT_TO_ACCOUNT || transferType === TransferType.PERSON_TO_BANK) ? 'حساب مقصد (واریز)' : 'شخص مقصد (دریافت کننده)'}
+                                </label>
                                 <div className="relative">
-                                    <select
-                                        value={toAccountId}
-                                        onChange={(e) => setToAccountId(e.target.value)}
-                                        className="w-full p-3 pl-10 bg-emerald-50 border border-emerald-100 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none appearance-none text-slate-700 font-medium transition-all"
-                                    >
-                                        <option value="">انتخاب کنید...</option>
-                                        {assetAccounts.map(acc => (
-                                            <option key={acc.id} value={acc.id}>{acc.name} ({formatPrice(acc.balance)})</option>
-                                        ))}
-                                    </select>
+                                    {(transferType === TransferType.ACCOUNT_TO_ACCOUNT || transferType === TransferType.PERSON_TO_BANK) ? (
+                                        <select
+                                            value={toAccountId}
+                                            onChange={(e) => setToAccountId(e.target.value)}
+                                            className="w-full p-3 pl-10 bg-emerald-50 border border-emerald-100 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none appearance-none text-slate-700 font-medium transition-all"
+                                        >
+                                            <option value="">انتخاب حساب...</option>
+                                            {assetAccounts.map(acc => (
+                                                <option key={acc.id} value={acc.id}>{acc.name} ({formatPrice(acc.balance)})</option>
+                                            ))}
+                                        </select>
+                                    ) : (
+                                        <select
+                                            value={toPersonId}
+                                            onChange={(e) => setToPersonId(e.target.value)}
+                                            className="w-full p-3 pl-10 bg-emerald-50 border border-emerald-100 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none appearance-none text-slate-700 font-medium transition-all"
+                                        >
+                                            <option value="">انتخاب شخص...</option>
+                                            {allPeople.map(p => (
+                                                <option key={p.id} value={p.id}>{p.name} ({p.type})</option>
+                                            ))}
+                                        </select>
+                                    )}
                                     <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                                        <Building2 className="w-4 h-4 text-emerald-400" />
+                                        {(transferType === TransferType.ACCOUNT_TO_ACCOUNT || transferType === TransferType.PERSON_TO_BANK) ? <Building2 className="w-4 h-4 text-emerald-400" /> : <User className="w-4 h-4 text-emerald-400" />}
                                     </div>
                                 </div>
                             </div>
@@ -207,13 +300,32 @@ const Transfers: React.FC<TransfersProps> = ({ accounts, transfers, onAddTransfe
                                 </thead>
                                 <tbody className="divide-y divide-slate-50">
                                     {sortedTransfers.map((t) => {
-                                        const fromAcc = accounts.find(a => a.id === t.fromAccountId);
-                                        const toAcc = accounts.find(a => a.id === t.toAccountId);
+                                        let fromName = 'ناشناس';
+                                        let toName = 'ناشناس';
+
+                                        if (t.type === TransferType.ACCOUNT_TO_ACCOUNT) {
+                                            fromName = accounts.find(a => a.id === t.fromAccountId)?.name || 'ناشناس';
+                                            toName = accounts.find(a => a.id === t.toAccountId)?.name || 'ناشناس';
+                                        } else if (t.type === TransferType.PERSON_TO_PERSON) {
+                                            fromName = getPersonName(t.fromPersonId || '');
+                                            toName = getPersonName(t.toPersonId || '');
+                                        } else if (t.type === TransferType.PERSON_TO_BANK) {
+                                            fromName = getPersonName(t.fromPersonId || '');
+                                            toName = accounts.find(a => a.id === t.toAccountId)?.name || 'ناشناس';
+                                        } else if (t.type === TransferType.BANK_TO_PERSON) {
+                                            fromName = accounts.find(a => a.id === t.fromAccountId)?.name || 'ناشناس';
+                                            toName = getPersonName(t.toPersonId || '');
+                                        } else {
+                                            // Fallback for legacy records
+                                            fromName = accounts.find(a => a.id === t.fromAccountId)?.name || 'ناشناس';
+                                            toName = accounts.find(a => a.id === t.toAccountId)?.name || 'ناشناس';
+                                        }
+
                                         return (
                                             <tr key={t.id} className="hover:bg-slate-50 transition-colors group">
                                                 <td className="p-4 text-sm text-slate-600 font-medium">{t.date}</td>
-                                                <td className="p-4 text-sm text-rose-600 font-medium">{fromAcc?.name || 'ناشناس'}</td>
-                                                <td className="p-4 text-sm text-emerald-600 font-medium">{toAcc?.name || 'ناشناس'}</td>
+                                                <td className="p-4 text-sm text-rose-600 font-medium">{fromName}</td>
+                                                <td className="p-4 text-sm text-emerald-600 font-medium">{toName}</td>
                                                 <td className="p-4 text-sm font-bold text-slate-800 dir-ltr text-left">{formatPrice(t.amount)}</td>
                                                 <td className="p-4 text-sm text-slate-500">{t.description}</td>
                                                 <td className="p-4">

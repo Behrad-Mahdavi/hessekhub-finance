@@ -11,6 +11,7 @@ const daysAgo = (days: number) => {
 export const INITIAL_ACCOUNTS: Account[] = [
   { id: '101', code: '1010', name: 'موجودی نقد (صندوق)', type: AccountType.ASSET, balance: 50000000 },
   { id: '102', code: '1020', name: 'حساب بانکی', type: AccountType.ASSET, balance: 120000000 },
+  { id: '107', code: '1025', name: 'حساب دریافتنی (عمومی)', type: AccountType.ASSET, balance: 0 },
   { id: '103', code: '1030', name: 'حساب اسنپ فود', type: AccountType.ASSET, balance: 0 },
   { id: '104', code: '1040', name: 'حساب تپسی فود', type: AccountType.ASSET, balance: 0 },
   { id: '105', code: '1050', name: 'حساب فودکس', type: AccountType.ASSET, balance: 0 },
@@ -69,9 +70,9 @@ export const MOCK_SALES: SaleRecord[] = [
 ];
 
 export const INITIAL_EMPLOYEES: Employee[] = [
-  { id: 'EMP-1', fullName: 'علی محمدی', role: 'باریستا', baseSalary: 12000000, joinDate: '1402/01/15' },
-  { id: 'EMP-2', fullName: 'سارا احمدی', role: 'ادمین', baseSalary: 15000000, joinDate: '1402/05/01' },
-  { id: 'EMP-3', fullName: 'دکتر حسینی', role: 'متخصص تغذیه', baseSalary: 25000000, joinDate: '1401/11/10' },
+  { id: 'EMP-1', fullName: 'علی محمدی', role: 'باریستا', baseSalary: 12000000, joinDate: '1402/01/15', balance: 0 },
+  { id: 'EMP-2', fullName: 'سارا احمدی', role: 'ادمین', baseSalary: 15000000, joinDate: '1402/05/01', balance: 0 },
+  { id: 'EMP-3', fullName: 'دکتر حسینی', role: 'متخصص تغذیه', baseSalary: 25000000, joinDate: '1401/11/10', balance: 0 },
 ];
 
 // Helper to initialize journals based on mock approved/sales data

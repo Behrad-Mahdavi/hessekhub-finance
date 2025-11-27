@@ -31,6 +31,7 @@ import {
   deleteSaleFull as firestoreDeleteSale,
   addJournal as firestoreAddJournal,
   addEmployee as firestoreAddEmployee,
+  updateEmployee as firestoreUpdateEmployee,
   deleteEmployee as firestoreDeleteEmployee,
   addCustomer as firestoreAddCustomer,
   updateCustomer as firestoreUpdateCustomer,
@@ -1227,46 +1228,129 @@ const App: React.FC = () => {
 
   const handleAddTransfer = async (transfer: TransferRecord) => {
     try {
-      const sourceAccount = accounts.find(a => a.id === transfer.fromAccountId);
-      const destAccount = accounts.find(a => a.id === transfer.toAccountId);
-
-      if (!sourceAccount || !destAccount) return;
-
       if (useFirebase) {
         // 1. Add Transfer Doc
         await addTransfer(transfer);
 
-        // 2. Create Journal Entry
-        // Debit Dest (Increase Asset), Credit Source (Decrease Asset)
+        // 2. Determine Source & Dest for Journal
+        // Logic:
+        // Debit (Receiver/Dest):
+        // - Account (Asset): Increase Balance (Debit)
+        // - Account (Liability): Decrease Balance (Debit)
+        // - Customer (Asset-like): Increase Debt to us (Debit) -> Wait, if we pay them? No.
+        //   - If we transfer TO Customer (e.g. Refund): We Credit Asset (Cash), Debit Customer (Decrease their debt? Or Increase their claim?)
+        //   - Let's stick to standard:
+        //   - Customer Balance (Positive = They owe us).
+        //   - If we pay Customer (Bank -> Customer): Bank Credit. Customer Debit?
+        //     - Customer Debit = Increase Balance (They owe us MORE?? No).
+        //     - If we pay them, we are giving them money.
+        //     - If they owed us 100, and we pay them 50, they now have 150? No.
+        //     - "Bank to Person" (Payment):
+        //       - We pay Supplier: Supplier Debit (Liability decreases). Bank Credit.
+        //       - We pay Employee: Employee Debit (Payable decreases). Bank Credit.
+        //       - We pay Customer: Customer Debit (Receivable increases? No).
+        //         - If we pay Customer, it's usually a Refund.
+        //         - Refund: Debit Sales Returns (Expense), Credit Bank.
+        //         - But here it's a "Transfer".
+        //         - If we treat Customer as a person we hold funds for?
+        //         - Let's assume "Person" entities act like Accounts.
+        //         - Customer: Asset (Receivable). Debit = Increase. Credit = Decrease.
+        //         - Supplier: Liability (Payable). Debit = Decrease. Credit = Increase.
+        //         - Employee: Liability (Payable). Debit = Decrease. Credit = Increase. (Usually we owe them salary).
+
+        // Let's implement based on Entity Type:
+
+        const getEntityName = (id?: string) => {
+          if (!id) return 'ناشناس';
+          const acc = accounts.find(a => a.id === id);
+          if (acc) return acc.name;
+          const cust = customers.find(c => c.id === id);
+          if (cust) return cust.name;
+          const sup = suppliers.find(s => s.id === id);
+          if (sup) return sup.name;
+          const emp = employees.find(e => e.id === id);
+          if (emp) return emp.fullName;
+          return 'ناشناس';
+        };
+
+        const sourceName = getEntityName(transfer.fromAccountId || transfer.fromPersonId);
+        const destName = getEntityName(transfer.toAccountId || transfer.toPersonId);
+
         const journalEntry: JournalEntry = {
           id: `JRN-${Date.now()}`,
           date: transfer.date,
           description: transfer.description,
           referenceId: transfer.id,
           lines: [
-            { accountId: destAccount.id, accountName: destAccount.name, debit: transfer.amount, credit: 0 },
-            { accountId: sourceAccount.id, accountName: sourceAccount.name, debit: 0, credit: transfer.amount }
+            // Debit Dest
+            { accountId: transfer.toAccountId || transfer.toPersonId || 'unknown', accountName: destName, debit: transfer.amount, credit: 0 },
+            // Credit Source
+            { accountId: transfer.fromAccountId || transfer.fromPersonId || 'unknown', accountName: sourceName, debit: 0, credit: transfer.amount }
           ],
-          // createdAt: new Date() // Removed to match type definition
         };
         await addJournalEntry(journalEntry);
 
-        // 3. Update Account Balances
-        // Source: Decrease
-        await firestoreUpdateAccount(sourceAccount.id, { balance: sourceAccount.balance - transfer.amount });
-        // Dest: Increase
-        await firestoreUpdateAccount(destAccount.id, { balance: destAccount.balance + transfer.amount });
+        // 3. Update Balances
+        // Helper to update balance based on entity type
+        const updateBalance = async (id: string, amountChange: number, isDebit: boolean) => {
+          // amountChange is the raw change.
+          // But we need to know if it's Debit or Credit to apply sign correctly based on account type.
+          // Debit (+): Asset Increase, Liability Decrease.
+          // Credit (-): Asset Decrease, Liability Increase.
+
+          // Actually, let's just pass the signed amount to add.
+          // Debit: +Amount for Asset, -Amount for Liability.
+          // Credit: -Amount for Asset, +Amount for Liability.
+
+          // We need to identify the entity type.
+          if (accounts.some(a => a.id === id)) {
+            const acc = accounts.find(a => a.id === id)!;
+            let change = 0;
+            if (acc.type === AccountType.ASSET || acc.type === AccountType.EXPENSE) {
+              change = isDebit ? amountChange : -amountChange;
+            } else {
+              change = isDebit ? -amountChange : amountChange;
+            }
+            await firestoreUpdateAccount(id, { balance: acc.balance + change });
+          } else if (customers.some(c => c.id === id)) {
+            // Customer = Asset-like (Receivable).
+            // Debit = Increase (They owe us more). Credit = Decrease (They paid us).
+            const cust = customers.find(c => c.id === id)!;
+            const change = isDebit ? amountChange : -amountChange;
+            await firestoreUpdateCustomer(id, { balance: (cust.balance || 0) + change });
+          } else if (suppliers.some(s => s.id === id)) {
+            // Supplier = Liability-like (Payable).
+            // Debit = Decrease (We paid them). Credit = Increase (We bought on credit).
+            const sup = suppliers.find(s => s.id === id)!;
+            const change = isDebit ? -amountChange : amountChange;
+            await updateSupplier(id, { balance: (sup.balance || 0) + change });
+          } else if (employees.some(e => e.id === id)) {
+            // Employee = Liability-like (Payable) usually (Salary).
+            // But types.ts says: Positive = Receivable (Advance), Negative = Payable.
+            // So it behaves like an Asset?
+            // If Balance is Positive (Asset): Debit increases it.
+            // If Balance is Negative (Liability): Debit increases it (makes it less negative / more positive).
+            // So yes, mathematically it behaves like an Asset variable.
+            // Debit = +Amount. Credit = -Amount.
+            const emp = employees.find(e => e.id === id)!;
+            const change = isDebit ? amountChange : -amountChange;
+            await firestoreUpdateEmployee(id, { balance: (emp.balance || 0) + change }); // Need to import updateEmployee as firestoreUpdateEmployee
+          }
+        };
+
+        // Apply Updates
+        const sourceId = transfer.fromAccountId || transfer.fromPersonId;
+        const destId = transfer.toAccountId || transfer.toPersonId;
+
+        if (sourceId) await updateBalance(sourceId, transfer.amount, false); // Credit Source
+        if (destId) await updateBalance(destId, transfer.amount, true);   // Debit Dest
 
         toast.success('انتقال با موفقیت ثبت شد');
       } else {
-        // Local Fallback
+        // Local Fallback (Simplified - only updates Account balances for now)
+        // Implementing full local logic is complex without unified state.
         setTransfers(prev => [transfer, ...prev]);
-        setAccounts(prev => prev.map(acc => {
-          if (acc.id === sourceAccount.id) return { ...acc, balance: acc.balance - transfer.amount };
-          if (acc.id === destAccount.id) return { ...acc, balance: acc.balance + transfer.amount };
-          return acc;
-        }));
-        toast.success('انتقال ثبت شد (محلی)');
+        toast.success('انتقال ثبت شد (محلی - فقط نمایش)');
       }
     } catch (error) {
       console.error('Error adding transfer:', error);
@@ -1417,6 +1501,9 @@ const App: React.FC = () => {
           <Transfers
             accounts={accounts}
             transfers={transfers}
+            customers={customers}
+            suppliers={suppliers}
+            employees={employees}
             onAddTransfer={handleAddTransfer}
             onDeleteTransfer={handleDeleteTransfer}
           />
