@@ -55,6 +55,53 @@ export interface JournalEntry {
   referenceId?: string; // Link to Purchase ID or Sale ID
 }
 
+export enum CheckStatus {
+  PENDING = 'PENDING',
+  PASSED = 'PASSED', // Cleared/Cashed
+  BOUNCED = 'BOUNCED', // Bargasht
+  CANCELLED = 'CANCELLED'
+}
+
+export interface PayableCheck {
+  id: string;
+  checkNumber: string;
+  amount: number;
+  payee: string; // Dar Vajh-e
+  dueDate: string; // Tarikh-e Sarresid
+  issueDate: string; // Tarikh-e Sodour
+  bankName?: string; // Name of the bank (optional, usually implied by the account)
+  description?: string;
+  status: CheckStatus;
+  createdAt: Date;
+  passedDate?: string; // When it was cleared
+  accountId?: string; // The bank account ID it was drawn on (when passed)
+}
+
+export interface Loan {
+  id: string;
+  lender: string; // Bank name or Person name
+  amount: number; // Principal
+  interestRate: number; // Percentage (0 if Qard-al-Hasana)
+  startDate: string;
+  endDate?: string;
+  installmentAmount?: number;
+  installmentsCount?: number;
+  remainingBalance: number;
+  status: 'ACTIVE' | 'PAID_OFF';
+  description?: string;
+  createdAt: Date;
+}
+
+export interface LoanRepayment {
+  id: string;
+  loanId: string;
+  amount: number; // Total payment
+  principalAmount: number; // Portion reducing the loan
+  interestAmount: number; // Portion for interest expense
+  date: string;
+  paymentAccountId: string;
+}
+
 export interface PurchaseRequest {
   id: string;
   requester: string;
@@ -102,7 +149,7 @@ export interface SaleRecord {
   paymentAccountId?: string; // New: ID of the bank account receiving POS/C2C payments
   posAmount?: number; // New: Amount received via POS
   cashAmount?: number; // New: Amount received in cash
-  cardToCardTransactions?: { amount: number; sender: string }[]; // New: List of C2C transactions
+  cardToCardTransactions?: { amount: number; sender: string; receiverAccountId?: string }[]; // New: List of C2C transactions
   customerId?: string; // New: Link to Customer
   subscriptionId?: string; // New: Link to Subscription
   snappFoodAmount?: number; // New: SnappFood sales

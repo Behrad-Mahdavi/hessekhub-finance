@@ -45,6 +45,7 @@ const Sales: React.FC<SalesProps> = ({ sales, accounts, employees, onAddSale, on
     const [c2cTransactions, setC2cTransactions] = useState<{ amount: number; sender: string }[]>([]);
     const [tempC2cAmount, setTempC2cAmount] = useState('');
     const [tempC2cSender, setTempC2cSender] = useState('');
+    const [tempC2cReceiverAccountId, setTempC2cReceiverAccountId] = useState('');
 
     // Reset form when tab changes
     useEffect(() => {
@@ -60,6 +61,7 @@ const Sales: React.FC<SalesProps> = ({ sales, accounts, employees, onAddSale, on
         setC2cTransactions([]);
         setTempC2cAmount('');
         setTempC2cSender('');
+        setTempC2cReceiverAccountId('');
 
         setSnappFoodAmount('');
         setTapsiFoodAmount('');
@@ -90,9 +92,14 @@ const Sales: React.FC<SalesProps> = ({ sales, accounts, employees, onAddSale, on
             toast.error('لطفاً مبلغ و نام واریز کننده را وارد کنید');
             return;
         }
-        setC2cTransactions([...c2cTransactions, { amount: parseFloat(tempC2cAmount), sender: tempC2cSender }]);
+        setC2cTransactions([...c2cTransactions, {
+            amount: parseFloat(tempC2cAmount),
+            sender: tempC2cSender,
+            receiverAccountId: tempC2cReceiverAccountId || undefined
+        }]);
         setTempC2cAmount('');
         setTempC2cSender('');
+        setTempC2cReceiverAccountId('');
     };
 
     const handleRemoveC2cTransaction = (index: number) => {
@@ -176,6 +183,7 @@ const Sales: React.FC<SalesProps> = ({ sales, accounts, employees, onAddSale, on
         setC2cTransactions([]);
         setTempC2cAmount('');
         setTempC2cSender('');
+        setTempC2cReceiverAccountId('');
 
         setSnappFoodAmount('');
         setTapsiFoodAmount('');
@@ -277,40 +285,40 @@ const Sales: React.FC<SalesProps> = ({ sales, accounts, employees, onAddSale, on
                                 </div>
 
                                 {/* Delivery Apps Section */}
-                                <div className="grid grid-cols-3 gap-3">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1 flex items-center gap-1">
-                                            <Truck className="w-3 h-3" /> اسنپ فود
+                                        <label className="block text-sm font-bold text-slate-500 uppercase mb-2 flex items-center gap-1">
+                                            <Truck className="w-4 h-4" /> اسنپ فود
                                         </label>
                                         <input
                                             type="number"
                                             value={snappFoodAmount}
                                             onChange={(e) => setSnappFoodAmount(e.target.value)}
-                                            className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none dir-ltr text-left"
+                                            className="w-full p-4 border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none dir-ltr text-left text-lg font-bold"
                                             placeholder="0"
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1 flex items-center gap-1">
-                                            <Truck className="w-3 h-3" /> تپسی فود
+                                        <label className="block text-sm font-bold text-slate-500 uppercase mb-2 flex items-center gap-1">
+                                            <Truck className="w-4 h-4" /> تپسی فود
                                         </label>
                                         <input
                                             type="number"
                                             value={tapsiFoodAmount}
                                             onChange={(e) => setTapsiFoodAmount(e.target.value)}
-                                            className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none dir-ltr text-left"
+                                            className="w-full p-4 border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none dir-ltr text-left text-lg font-bold"
                                             placeholder="0"
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1 flex items-center gap-1">
-                                            <Truck className="w-3 h-3" /> فودکس
+                                        <label className="block text-sm font-bold text-slate-500 uppercase mb-2 flex items-center gap-1">
+                                            <Truck className="w-4 h-4" /> فودکس
                                         </label>
                                         <input
                                             type="number"
                                             value={foodexAmount}
                                             onChange={(e) => setFoodexAmount(e.target.value)}
-                                            className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none dir-ltr text-left"
+                                            className="w-full p-4 border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none dir-ltr text-left text-lg font-bold"
                                             placeholder="0"
                                         />
                                     </div>
@@ -385,7 +393,7 @@ const Sales: React.FC<SalesProps> = ({ sales, accounts, employees, onAddSale, on
                                                 />
                                             </div>
                                             <div className="space-y-3">
-                                                <div className="grid grid-cols-2 gap-3">
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                                     <div>
                                                         <label className="block text-xs font-bold text-indigo-700 mb-1">مبلغ کارت به کارت</label>
                                                         <input
@@ -405,6 +413,19 @@ const Sales: React.FC<SalesProps> = ({ sales, accounts, employees, onAddSale, on
                                                             className="w-full p-2 border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
                                                             placeholder="مثلاً: علی محمدی"
                                                         />
+                                                    </div>
+                                                    <div className="md:col-span-2">
+                                                        <label className="block text-xs font-bold text-indigo-700 mb-1">حساب دریافت کننده (اختیاری)</label>
+                                                        <select
+                                                            value={tempC2cReceiverAccountId}
+                                                            onChange={(e) => setTempC2cReceiverAccountId(e.target.value)}
+                                                            className="w-full p-2 border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-sm"
+                                                        >
+                                                            <option value="">انتخاب حساب...</option>
+                                                            {accounts.filter(a => a.type === AccountType.ASSET).map(acc => (
+                                                                <option key={acc.id} value={acc.id}>{acc.name}</option>
+                                                            ))}
+                                                        </select>
                                                     </div>
                                                 </div>
                                                 <button

@@ -18,6 +18,8 @@ export const INITIAL_ACCOUNTS: Account[] = [
   { id: '106', code: '1060', name: 'حساب دریافتنی پرسنل', type: AccountType.ASSET, balance: 0 },
   { id: '201', code: '2010', name: 'حساب‌های پرداختنی', type: AccountType.LIABILITY, balance: 0 },
   { id: '202', code: '2020', name: 'پیش‌دریافت درآمد اشتراک', type: AccountType.LIABILITY, balance: 0 },
+  { id: '203', code: '2030', name: 'اسناد پرداختنی (چک‌ها)', type: AccountType.LIABILITY, balance: 0 },
+  { id: '204', code: '2040', name: 'تسهیلات مالی (وام‌ها)', type: AccountType.LIABILITY, balance: 0 },
   { id: '301', code: '3010', name: 'سرمایه اولیه', type: AccountType.EQUITY, balance: 170000000 },
   { id: '401', code: '4010', name: 'درآمد کافه', type: AccountType.REVENUE, balance: 0 },
   { id: '402', code: '4020', name: 'درآمد تحقق‌یافته اشتراک', type: AccountType.REVENUE, balance: 0 },

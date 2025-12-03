@@ -12,11 +12,13 @@ import {
     setDoc,
     limit,
     increment,
-    getDoc
+    getDoc,
+    where
 } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Account, PurchaseRequest, SaleRecord, JournalEntry, Employee, Customer, Subscription, TransferRecord } from '../types';
+import { Account, PurchaseRequest, SaleRecord, JournalEntry, Employee, Customer, Subscription, TransferRecord, PayableCheck, Loan, LoanRepayment, CheckStatus } from '../types';
 import { INITIAL_ACCOUNTS, MOCK_PURCHASES, MOCK_SALES, INITIAL_JOURNALS, INITIAL_EMPLOYEES } from '../constants';
+import { toPersianDate } from '../utils';
 
 // Collection References
 const accountsRef = collection(db, 'accounts');
@@ -714,5 +716,125 @@ export const deleteTransferFull = async (transferId: string) => {
     }
 
     await batch.commit();
+};
+
+// --- Checks ---
+export const addCheck = async (check: PayableCheck) => {
+    const docRef = doc(db, 'checks', check.id);
+    await setDoc(docRef, cleanData(check));
+};
+
+export const updateCheckStatus = async (checkId: string, status: CheckStatus, accountId?: string) => {
+    const batch = writeBatch(db);
+    const checkRef = doc(db, 'checks', checkId);
+
+    // Update Check Status
+    const updateData: any = { status };
+    if (status === CheckStatus.PASSED && accountId) {
+        updateData.passedDate = toPersianDate(new Date());
+        updateData.accountId = accountId;
+    }
+    batch.update(checkRef, updateData);
+
+    // Accounting Logic for PASSED
+    if (status === CheckStatus.PASSED && accountId) {
+        const checkSnap = await getDoc(checkRef);
+        if (checkSnap.exists()) {
+            const check = checkSnap.data() as PayableCheck;
+
+            // 1. Credit Bank
+            const bankRef = doc(db, 'accounts', accountId);
+            batch.update(bankRef, { balance: increment(-check.amount) });
+
+            // 2. Debit Checks Payable (2030)
+            const q = query(accountsRef, where('code', '==', '2030'));
+            const querySnapshot = await getDocs(q);
+            if (!querySnapshot.empty) {
+                const checksPayableRef = querySnapshot.docs[0].ref;
+                // Liability Debit = Decrease Balance? 
+                // Wait. Liability Balance is Credit (Positive).
+                // Debit Liability = Decrease Debt.
+                // So we SUBTRACT from balance.
+                // Checks Payable (Liability) Balance: 1000 (We owe 1000).
+                // We pay 1000. Balance becomes 0.
+                // So increment(-amount).
+                batch.update(checksPayableRef, { balance: increment(-check.amount) });
+            }
+        }
+    }
+
+    await batch.commit();
+};
+
+export const deleteCheck = async (id: string) => {
+    const docRef = doc(db, 'checks', id);
+    await deleteDoc(docRef);
+};
+
+// --- Loans ---
+export const addLoan = async (loan: Loan, depositAccountId: string) => {
+    const batch = writeBatch(db);
+
+    // 1. Save Loan
+    const loanRef = doc(db, 'loans', loan.id);
+    batch.set(loanRef, cleanData(loan));
+
+    // 2. Update Bank Balance (Receive Loan - Debit Asset)
+    const bankRef = doc(db, 'accounts', depositAccountId);
+    batch.update(bankRef, { balance: increment(loan.amount) });
+
+    // 3. Update Loans Payable Balance (2040 - Credit Liability)
+    // Credit Liability = Increase Debt.
+    // So increment(amount).
+    const q = query(accountsRef, where('code', '==', '2040'));
+    const querySnapshot = await getDocs(q);
+    if (!querySnapshot.empty) {
+        const loansPayableRef = querySnapshot.docs[0].ref;
+        batch.update(loansPayableRef, { balance: increment(loan.amount) });
+    }
+
+    await batch.commit();
+};
+
+export const addLoanRepayment = async (repayment: LoanRepayment) => {
+    const batch = writeBatch(db);
+
+    // 1. Save Repayment
+    const repayRef = doc(db, 'loan_repayments', repayment.id);
+    batch.set(repayRef, cleanData(repayment));
+
+    // 2. Update Loan Remaining Balance
+    const loanRef = doc(db, 'loans', repayment.loanId);
+    batch.update(loanRef, { remainingBalance: increment(-repayment.principalAmount) });
+
+    // 3. Update Bank Balance (Payment - Credit Asset)
+    const bankRef = doc(db, 'accounts', repayment.paymentAccountId);
+    batch.update(bankRef, { balance: increment(-repayment.amount) });
+
+    // 4. Update Loans Payable (2040 - Debit Liability = Decrease Debt)
+    // Only Principal reduces the Liability.
+    const qLoan = query(accountsRef, where('code', '==', '2040'));
+    const snapLoan = await getDocs(qLoan);
+    if (!snapLoan.empty) {
+        const loansPayableRef = snapLoan.docs[0].ref;
+        batch.update(loansPayableRef, { balance: increment(-repayment.principalAmount) });
+    }
+
+    // 5. Update Interest Expense (5080 - Debit Expense = Increase Balance)
+    if (repayment.interestAmount > 0) {
+        const qInterest = query(accountsRef, where('code', '==', '5080'));
+        const snapInterest = await getDocs(qInterest);
+        if (!snapInterest.empty) {
+            const interestExpRef = snapInterest.docs[0].ref;
+            batch.update(interestExpRef, { balance: increment(repayment.interestAmount) });
+        }
+    }
+
+    await batch.commit();
+};
+
+export const deleteLoan = async (id: string) => {
+    const docRef = doc(db, 'loans', id);
+    await deleteDoc(docRef);
 };
 

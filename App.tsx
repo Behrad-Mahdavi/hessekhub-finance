@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
 import Transfers from './components/Transfers';
-import { Account, PurchaseRequest, SaleRecord, JournalEntry, RevenueStream, TransactionStatus, UserRole, JournalLine, SubscriptionStatus, AccountType, Employee, Customer, Subscription, PayrollPayment, Supplier, InventoryItem, TransferRecord } from './types';
+
 import { toPersianDate } from './utils';
 import Dashboard from './components/Dashboard';
 import Expenses from './components/Expenses';
@@ -13,8 +13,11 @@ import Payroll from './components/Payroll';
 import SubscriptionManager from './components/SubscriptionManager';
 import InventoryManager from './components/InventoryManager';
 import TransactionManager from './components/TransactionManager';
-import { LayoutDashboard, ShoppingCart, PieChart, Book, Settings as SettingsIcon, Shield, Menu, X, Wallet, Users, Lock, LogIn, Truck, Package, History, ArrowRightLeft, LineChart, CreditCard, Home } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, PieChart, Book, Settings as SettingsIcon, Shield, Menu, X, Wallet, Users, Lock, LogIn, Truck, Package, History, ArrowRightLeft, LineChart, CreditCard, Home, FileText, Landmark } from 'lucide-react';
 import Analytics from './components/Analytics';
+import ChecksManager from './components/ChecksManager';
+import LoansManager from './components/LoansManager';
+import { Account, PurchaseRequest, SaleRecord, JournalEntry, RevenueStream, TransactionStatus, UserRole, JournalLine, SubscriptionStatus, AccountType, Employee, Customer, Subscription, PayrollPayment, Supplier, InventoryItem, TransferRecord, PayableCheck, Loan, LoanRepayment, CheckStatus } from './types';
 
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
@@ -52,11 +55,15 @@ import {
   addInventoryItem,
   updateInventoryItem,
   addTransfer,
-  deleteTransferFull
+  deleteTransferFull,
+  addCheck,
+  updateCheckStatus,
+  addLoan,
+  addLoanRepayment
 } from './services/firestore';
 import SupplierManager from './components/SupplierManager';
 
-type View = 'dashboard' | 'expenses' | 'sales' | 'ledger' | 'settings' | 'payroll' | 'subscriptions' | 'suppliers' | 'inventory' | 'transactions' | 'transfers' | 'analytics';
+type View = 'dashboard' | 'expenses' | 'sales' | 'ledger' | 'settings' | 'payroll' | 'subscriptions' | 'suppliers' | 'inventory' | 'transactions' | 'transfers' | 'analytics' | 'checks' | 'loans';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('dashboard');
@@ -98,6 +105,9 @@ const App: React.FC = () => {
   const [payrollPayments, setPayrollPayments] = useState<PayrollPayment[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
+  const [checks, setChecks] = useState<PayableCheck[]>([]);
+  const [loans, setLoans] = useState<Loan[]>([]);
+  const [loanRepayments, setLoanRepayments] = useState<LoanRepayment[]>([]);
   const [transfers, setTransfers] = useState<TransferRecord[]>([]);
   const [useFirebase, setUseFirebase] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState<'checking' | 'connected' | 'error'>('checking');
@@ -267,6 +277,18 @@ const App: React.FC = () => {
 
     addSub(onSnapshot(collection(db, 'transfers'), (snapshot) => {
       setTransfers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TransferRecord)));
+    }));
+
+    addSub(onSnapshot(collection(db, 'checks'), (snapshot) => {
+      setChecks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PayableCheck)));
+    }));
+
+    addSub(onSnapshot(collection(db, 'loans'), (snapshot) => {
+      setLoans(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Loan)));
+    }));
+
+    addSub(onSnapshot(collection(db, 'loan_repayments'), (snapshot) => {
+      setLoanRepayments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LoanRepayment)));
     }));
 
     // Cleanup function
@@ -960,7 +982,6 @@ const App: React.FC = () => {
         // Calculate Split Amounts
         const cashReceived = sale.cashAmount || 0;
         const c2cTransactions = sale.cardToCardTransactions || [];
-        const c2cTotal = c2cTransactions.reduce((sum, t) => sum + t.amount, 0);
         const posReceived = sale.posAmount || 0;
 
         const snappAmount = sale.snappFoodAmount || 0;
@@ -973,10 +994,26 @@ const App: React.FC = () => {
           newLines.push({ accountId: cashOnHandAccount.id, accountName: cashOnHandAccount.name, debit: cashReceived, credit: 0 });
         }
 
-        // 2. Debit Bank Account (POS + C2C)
-        const totalBankDeposit = posReceived + c2cTotal;
-        if (totalBankDeposit > 0) {
-          newLines.push({ accountId: bankAccount.id, accountName: bankAccount.name, debit: totalBankDeposit, credit: 0 });
+        // 2. Debit Bank Accounts (POS + C2C)
+        const bankDebits: Record<string, number> = {};
+
+        // POS
+        if (posReceived > 0) {
+          bankDebits[bankAccount.id] = (bankDebits[bankAccount.id] || 0) + posReceived;
+        }
+
+        // C2C
+        c2cTransactions.forEach(t => {
+          const targetId = t.receiverAccountId || bankAccount.id;
+          bankDebits[targetId] = (bankDebits[targetId] || 0) + t.amount;
+        });
+
+        // Create Journal Lines for Banks
+        for (const [accId, amount] of Object.entries(bankDebits)) {
+          const acc = accounts.find(a => a.id === accId);
+          if (acc) {
+            newLines.push({ accountId: acc.id, accountName: acc.name, debit: amount, credit: 0 });
+          }
         }
 
         // 3. Debit Delivery Apps & Employee Credit
@@ -1028,8 +1065,13 @@ const App: React.FC = () => {
             if (cashReceived > 0) {
               await firestoreUpdateAccount(cashOnHandAccount.id, { balance: cashOnHandAccount.balance + cashReceived });
             }
-            if (totalBankDeposit > 0) {
-              await firestoreUpdateAccount(bankAccount.id, { balance: bankAccount.balance + totalBankDeposit });
+
+            // Update Bank Balances (POS + C2C)
+            for (const [accId, amount] of Object.entries(bankDebits)) {
+              const acc = accounts.find(a => a.id === accId);
+              if (acc) {
+                await firestoreUpdateAccount(acc.id, { balance: acc.balance + amount });
+              }
             }
 
             await firestoreUpdateAccount(revenueAccount.id, {
@@ -1061,7 +1103,7 @@ const App: React.FC = () => {
           setJournals(prev => [...prev, journalEntry]);
           setAccounts(prev => prev.map(acc => {
             if (acc.id === cashOnHandAccount.id) return { ...acc, balance: acc.balance + cashReceived };
-            if (acc.id === bankAccount.id) return { ...acc, balance: acc.balance + totalBankDeposit };
+            if (bankDebits[acc.id]) return { ...acc, balance: acc.balance + bankDebits[acc.id] };
             if (acc.id === revenueAccount.id) return { ...acc, balance: acc.balance + (sale.grossAmount || 0) };
             if (sale.discount && sale.discount > 0 && acc.id === discountAccount.id) return { ...acc, balance: acc.balance + sale.discount };
             if (sale.refund && sale.refund > 0 && acc.id === refundAccount.id) return { ...acc, balance: acc.balance + sale.refund };
@@ -1392,6 +1434,8 @@ const App: React.FC = () => {
     { id: 'ledger', label: 'دفتر کل', icon: Book, view: 'ledger' },
     { id: 'inventory', label: 'مدیریت انبار', icon: Package, view: 'inventory' },
     { id: 'transfers', label: 'انتقال وجه', icon: ArrowRightLeft, view: 'transfers' },
+    { id: 'checks', label: 'چک‌های پرداختنی', icon: FileText, view: 'checks' },
+    { id: 'loans', label: 'تسهیلات و وام‌ها', icon: Landmark, view: 'loans' },
     { id: 'analytics', label: 'گزارش و تحلیل', icon: LineChart, view: 'analytics' },
     { id: 'transactions', label: 'مدیریت تراکنش‌ها', icon: History, view: 'transactions' },
     { id: 'settings', label: 'تنظیمات', icon: SettingsIcon, view: 'settings' },
@@ -1400,6 +1444,67 @@ const App: React.FC = () => {
   const handleNavClick = (view: View) => {
     setCurrentView(view);
     setIsMobileMenuOpen(false);
+  };
+
+  // Checks & Loans Logic
+  const handleAddCheck = async (check: PayableCheck) => {
+    try {
+      if (useFirebase) {
+        await addCheck(check);
+        toast.success('چک با موفقیت ثبت شد');
+      } else {
+        setChecks(prev => [...prev, check]);
+        toast.success('چک ثبت شد (محلی)');
+      }
+    } catch (error) {
+      console.error('Error adding check:', error);
+      toast.error('خطا در ثبت چک');
+    }
+  };
+
+  const handleUpdateCheckStatus = async (checkId: string, status: CheckStatus, accountId?: string) => {
+    try {
+      if (useFirebase) {
+        await updateCheckStatus(checkId, status, accountId);
+        toast.success('وضعیت چک تغییر کرد');
+      } else {
+        setChecks(prev => prev.map(c => c.id === checkId ? { ...c, status, passedDate: status === CheckStatus.PASSED ? toPersianDate(new Date()) : undefined, accountId } : c));
+        toast.success('وضعیت چک تغییر کرد (محلی)');
+      }
+    } catch (error) {
+      console.error('Error updating check status:', error);
+      toast.error('خطا در تغییر وضعیت چک');
+    }
+  };
+
+  const handleAddLoan = async (loan: Loan, depositAccountId: string) => {
+    try {
+      if (useFirebase) {
+        await addLoan(loan, depositAccountId);
+        toast.success('وام با موفقیت ثبت شد');
+      } else {
+        setLoans(prev => [...prev, loan]);
+        toast.success('وام ثبت شد (محلی)');
+      }
+    } catch (error) {
+      console.error('Error adding loan:', error);
+      toast.error('خطا در ثبت وام');
+    }
+  };
+
+  const handleAddLoanRepayment = async (repayment: LoanRepayment) => {
+    try {
+      if (useFirebase) {
+        await addLoanRepayment(repayment);
+        toast.success('قسط با موفقیت پرداخت شد');
+      } else {
+        setLoanRepayments(prev => [...prev, repayment]);
+        toast.success('قسط پرداخت شد (محلی)');
+      }
+    } catch (error) {
+      console.error('Error adding repayment:', error);
+      toast.error('خطا در پرداخت قسط');
+    }
   };
 
   const renderContent = () => {
@@ -1533,6 +1638,25 @@ const App: React.FC = () => {
             customers={customers}
             suppliers={suppliers}
             subscriptions={subscriptions}
+          />
+        );
+      case 'checks':
+        return (
+          <ChecksManager
+            checks={checks}
+            accounts={accounts}
+            onAddCheck={handleAddCheck}
+            onUpdateCheckStatus={handleUpdateCheckStatus}
+          />
+        );
+      case 'loans':
+        return (
+          <LoansManager
+            loans={loans}
+            repayments={loanRepayments}
+            accounts={accounts}
+            onAddLoan={handleAddLoan}
+            onAddRepayment={handleAddLoanRepayment}
           />
         );
       default:
