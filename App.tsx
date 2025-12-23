@@ -17,7 +17,7 @@ import { LayoutDashboard, ShoppingCart, PieChart, Book, Settings as SettingsIcon
 import Analytics from './components/Analytics';
 import ChecksManager from './components/ChecksManager';
 import LoansManager from './components/LoansManager';
-import { Account, PurchaseRequest, SaleRecord, JournalEntry, RevenueStream, TransactionStatus, UserRole, JournalLine, SubscriptionStatus, AccountType, Employee, Customer, Subscription, PayrollPayment, Supplier, InventoryItem, TransferRecord, PayableCheck, Loan, LoanRepayment, CheckStatus } from './types';
+import { Account, PurchaseRequest, SaleRecord, JournalEntry, RevenueStream, TransactionStatus, UserRole, JournalLine, SubscriptionStatus, AccountType, Employee, Customer, Subscription, PayrollPayment, Supplier, InventoryItem, TransferRecord, PayableCheck, Loan, LoanRepayment, CheckStatus, InventoryTransaction } from './types';
 
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
@@ -59,7 +59,11 @@ import {
   addCheck,
   updateCheckStatus,
   addLoan,
-  addLoanRepayment
+  addLoanRepayment,
+  deleteLoanFull,
+  editLoanFull,
+  deleteCheckFull,
+  deleteLoanRepaymentFull
 } from './services/firestore';
 import SupplierManager from './components/SupplierManager';
 
@@ -109,6 +113,7 @@ const App: React.FC = () => {
   const [loans, setLoans] = useState<Loan[]>([]);
   const [loanRepayments, setLoanRepayments] = useState<LoanRepayment[]>([]);
   const [transfers, setTransfers] = useState<TransferRecord[]>([]);
+  const [inventoryTransactions, setInventoryTransactions] = useState<InventoryTransaction[]>([]);
   const [useFirebase, setUseFirebase] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState<'checking' | 'connected' | 'error'>('checking');
   const [connectionError, setConnectionError] = useState<string>('');
@@ -289,6 +294,10 @@ const App: React.FC = () => {
 
     addSub(onSnapshot(collection(db, 'loan_repayments'), (snapshot) => {
       setLoanRepayments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LoanRepayment)));
+    }));
+
+    addSub(onSnapshot(collection(db, 'inventory_transactions'), (snapshot) => {
+      setInventoryTransactions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as InventoryTransaction)));
     }));
 
     // Cleanup function
@@ -1304,6 +1313,10 @@ const App: React.FC = () => {
 
         const getEntityName = (id?: string) => {
           if (!id) return 'ناشناس';
+          if (id === 'PLATFORM-SNAPP') return 'اسنپ فود';
+          if (id === 'PLATFORM-TAPSI') return 'تپسی فود';
+          if (id === 'PLATFORM-FOODEX') return 'فودکس';
+
           const acc = accounts.find(a => a.id === id);
           if (acc) return acc.name;
           const cust = customers.find(c => c.id === id);
@@ -1345,6 +1358,12 @@ const App: React.FC = () => {
           // Credit: -Amount for Asset, +Amount for Liability.
 
           // We need to identify the entity type.
+          if (id.startsWith('PLATFORM-')) {
+            // Platform transfers don't update a tracked balance entity in this system yet.
+            // Just return as verified.
+            return;
+          }
+
           if (accounts.some(a => a.id === id)) {
             const acc = accounts.find(a => a.id === id)!;
             let change = 0;
@@ -1507,6 +1526,36 @@ const App: React.FC = () => {
     }
   };
 
+  const handleDeleteLoan = async (loanId: string) => {
+    try {
+      if (useFirebase) {
+        await deleteLoanFull(loanId);
+        toast.success('وام با موفقیت حذف شد');
+      } else {
+        setLoans(prev => prev.filter(l => l.id !== loanId));
+        toast.success('وام حذف شد (محلی)');
+      }
+    } catch (error) {
+      console.error('Error deleting loan:', error);
+      toast.error('خطا در حذف وام');
+    }
+  };
+
+  const handleEditLoan = async (loanId: string, updatedLoan: Loan, depositAccountId: string) => {
+    try {
+      if (useFirebase) {
+        await editLoanFull(loanId, updatedLoan, depositAccountId);
+        toast.success('وام با موفقیت ویرایش شد');
+      } else {
+        setLoans(prev => prev.map(l => l.id === loanId ? updatedLoan : l));
+        toast.success('وام ویرایش شد (محلی)');
+      }
+    } catch (error) {
+      console.error('Error editing loan:', error);
+      toast.error('خطا در ویرایش وام');
+    }
+  };
+
   const renderContent = () => {
     switch (currentView) {
       case 'dashboard':
@@ -1628,6 +1677,12 @@ const App: React.FC = () => {
             payrollPayments={payrollPayments}
             journals={journals}
             accounts={accounts}
+            inventoryTransactions={inventoryTransactions}
+            inventoryItems={inventoryItems}
+            transfers={transfers}
+            checks={checks}
+            loans={loans}
+            repayments={loanRepayments}
           />
         );
       case 'analytics':
@@ -1657,6 +1712,8 @@ const App: React.FC = () => {
             accounts={accounts}
             onAddLoan={handleAddLoan}
             onAddRepayment={handleAddLoanRepayment}
+            onDeleteLoan={handleDeleteLoan}
+            onEditLoan={handleEditLoan}
           />
         );
       default:

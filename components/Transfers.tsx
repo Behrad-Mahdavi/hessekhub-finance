@@ -28,8 +28,16 @@ const Transfers: React.FC<TransfersProps> = ({ accounts, transfers, customers, s
     // Filter accounts: Only Assets (Cash, Bank, etc.) usually participate in transfers
     const assetAccounts = accounts.filter(a => a.type === AccountType.ASSET);
 
+    // Platform Sources
+    const PLATFORMS = [
+        { id: 'PLATFORM-SNAPP', name: 'اسنپ فود', type: 'پلتفرم' },
+        { id: 'PLATFORM-TAPSI', name: 'تپسی فود', type: 'پلتفرم' },
+        { id: 'PLATFORM-FOODEX', name: 'فودکس', type: 'پلتفرم' }
+    ];
+
     // Combine all people for selection
     const allPeople = [
+        ...PLATFORMS,
         ...customers.map(c => ({ id: c.id, name: c.name, type: 'مشتری' })),
         ...suppliers.map(s => ({ id: s.id, name: s.name, type: 'تامین‌کننده' })),
         ...employees.map(e => ({ id: e.id, name: e.fullName, type: 'پرسنل' }))

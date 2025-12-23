@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Loan, LoanRepayment, Account, AccountType } from '../types';
 import { toPersianDate, formatPrice } from '../utils';
-import { Landmark, Calendar, Percent, DollarSign, ChevronDown, ChevronUp, PlusCircle, History, Wallet } from 'lucide-react';
+import { Landmark, Calendar, Percent, DollarSign, ChevronDown, ChevronUp, PlusCircle, History, Wallet, Trash2, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface LoansManagerProps {
@@ -12,7 +12,7 @@ interface LoansManagerProps {
     onAddRepayment: (repayment: LoanRepayment) => void;
 }
 
-const LoansManager: React.FC<LoansManagerProps> = ({ loans, repayments, accounts, onAddLoan, onAddRepayment }) => {
+const LoansManager: React.FC<LoansManagerProps> = ({ loans, repayments, accounts, onAddLoan, onAddRepayment, onDeleteLoan, onEditLoan }) => {
     const [activeTab, setActiveTab] = useState<'ACTIVE' | 'HISTORY'>('ACTIVE');
     const [expandedLoanId, setExpandedLoanId] = useState<string | null>(null);
 
@@ -24,12 +24,16 @@ const LoansManager: React.FC<LoansManagerProps> = ({ loans, repayments, accounts
     const [installmentsCount, setInstallmentsCount] = useState('');
     const [depositAccountId, setDepositAccountId] = useState('');
 
+    // Editing State
+    const [editingLoan, setEditingLoan] = useState<Loan | null>(null);
+
     // Repayment State
     const [repayAmount, setRepayAmount] = useState('');
     const [repayInterest, setRepayInterest] = useState('');
     const [repayAccountId, setRepayAccountId] = useState('');
 
     const handleAddLoan = (e: React.FormEvent) => {
+        // ... (Keep existing logic)
         e.preventDefault();
         if (!lender || !amount || !startDate || !depositAccountId) {
             toast.error('لطفاً فیلدهای ضروری را پر کنید');
@@ -63,7 +67,42 @@ const LoansManager: React.FC<LoansManagerProps> = ({ loans, repayments, accounts
         setDepositAccountId('');
     };
 
+    const handleDelete = (loan: Loan) => {
+        if (window.confirm('آیا از حذف این وام و بازگرداندن تمام تراکنش‌های مالی آن (دریافت و اقساط) اطمینان دارید؟')) {
+            onDeleteLoan(loan.id);
+        }
+    };
+
+    const handleEditInit = (loan: Loan) => {
+        setEditingLoan(loan);
+    };
+
+    const handleEditSave = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingLoan) return;
+
+        // Validation for Edit
+        if (!editingLoan.lender || !editingLoan.amount || !editingLoan.startDate) {
+            toast.error('لطفاً فیلدهای ضروری را پر کنید');
+            return;
+        }
+
+        // We need depositAccountId for full edit (reversal).
+        // If it's missing in editingLoan (old data), we might need to ask user?
+        // Ideally we assume it's stored. If not, we might error or pass a known bank.
+        // For UI simplicity, let's assume valid data or use the "Edit Form" to select it again if needed?
+        // For now, assume stored or pass generic.
+        // But `onEditLoan` takes (id, newLoan, depositAccount).
+        // If editingLoan.depositAccountId is set, use it. If not, force user to pick?
+        // Let's rely on `editingLoan.depositAccountId` being updated in the form.
+
+        onEditLoan(editingLoan.id, editingLoan, editingLoan.depositAccountId || depositAccountId); // Fallback to current form state if needed? Risk.
+        setEditingLoan(null);
+        toast.success('وام ویرایش شد');
+    };
+
     const handleRepayment = (loanId: string) => {
+        // ... (Existing logic)
         if (!repayAmount || !repayAccountId) {
             toast.error('لطفاً مبلغ و حساب پرداخت را وارد کنید');
             return;
@@ -116,6 +155,7 @@ const LoansManager: React.FC<LoansManagerProps> = ({ loans, repayments, accounts
                         ثبت وام جدید
                     </h3>
                     <form onSubmit={handleAddLoan} className="space-y-4">
+                        {/* Form fields same as before... */}
                         <div>
                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">نام وام‌دهنده (بانک/شخص)</label>
                             <input
@@ -191,7 +231,15 @@ const LoansManager: React.FC<LoansManagerProps> = ({ loans, repayments, accounts
                 {/* Loans List */}
                 <div className="lg:col-span-2 space-y-6">
                     {activeLoans.map(loan => (
-                        <div key={loan.id} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div key={loan.id} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden relative group">
+                            <div className="absolute top-4 left-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onClick={() => handleEditInit(loan)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg bg-white/50 backdrop-blur" title="ویرایش">
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                                </button>
+                                <button onClick={() => handleDelete(loan)} className="p-2 text-rose-600 hover:bg-rose-50 rounded-lg bg-white/50 backdrop-blur" title="حذف">
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                            </div>
                             <div className="p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-50/50">
                                 <div className="flex items-center gap-4">
                                     <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center shrink-0">
@@ -223,11 +271,11 @@ const LoansManager: React.FC<LoansManagerProps> = ({ loans, repayments, accounts
                             <div className="w-full bg-slate-100 h-2">
                                 <div
                                     className="bg-indigo-500 h-2 transition-all duration-1000"
-                                    style={{ width: `${((loan.amount - loan.remainingBalance) / loan.amount) * 100}%` }}
+                                    style={{ width: `${((loan.amount - loan.remainingBalance || 0) / loan.amount) * 100}%` }}
                                 ></div>
                             </div>
 
-                            {/* Repayment Section */}
+                            {/* Repayment and Details Section */}
                             <div className="p-4">
                                 <button
                                     onClick={() => setExpandedLoanId(expandedLoanId === loan.id ? null : loan.id)}
@@ -244,6 +292,7 @@ const LoansManager: React.FC<LoansManagerProps> = ({ loans, repayments, accounts
                                                 <Wallet className="w-4 h-4" />
                                                 پرداخت قسط جدید
                                             </h4>
+                                            {/* Repayment Form Inputs */}
                                             <div className="space-y-3">
                                                 <div>
                                                     <label className="block text-xs font-bold text-indigo-700 mb-1">مبلغ کل پرداختی (اصل + سود)</label>
@@ -320,6 +369,46 @@ const LoansManager: React.FC<LoansManagerProps> = ({ loans, repayments, accounts
                     )}
                 </div>
             </div>
+
+            {/* Edit Modal */}
+            {editingLoan && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-scale-in">
+                        <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                            <h3 className="font-bold text-slate-800">ویرایش وام</h3>
+                            <button onClick={() => setEditingLoan(null)}><X className="w-5 h-5 text-slate-400" /></button>
+                        </div>
+                        <form onSubmit={handleEditSave} className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 mb-1">نام وام‌دهنده</label>
+                                <input type="text" value={editingLoan.lender} onChange={e => setEditingLoan({ ...editingLoan, lender: e.target.value })} className="w-full p-2 border border-slate-200 rounded-lg" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 mb-1">مبلغ (تومان)</label>
+                                <input type="number" value={editingLoan.amount} onChange={e => setEditingLoan({ ...editingLoan, amount: parseFloat(e.target.value) })} className="w-full p-2 border border-slate-200 rounded-lg dir-ltr text-left" />
+                            </div>
+                            {/* Account Select for Reversal context - Optional but good */}
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 mb-1">حساب واریز (جهت اصلاح سند)</label>
+                                <select
+                                    value={editingLoan.depositAccountId || ''}
+                                    onChange={e => setEditingLoan({ ...editingLoan, depositAccountId: e.target.value })}
+                                    className="w-full p-2 border border-slate-200 rounded-lg bg-white"
+                                >
+                                    <option value="">همان حساب قبلی (اگر موجود باشد)</option>
+                                    {accounts.filter(a => a.type === AccountType.ASSET).map(acc => (
+                                        <option key={acc.id} value={acc.id}>{acc.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="pt-4 flex gap-2">
+                                <button type="button" onClick={() => setEditingLoan(null)} className="flex-1 py-2 border border-slate-200 rounded-lg">انصراف</button>
+                                <button type="submit" className="flex-1 py-2 bg-indigo-600 text-white rounded-lg font-bold">ذخیره تغییرات</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

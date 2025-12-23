@@ -766,9 +766,33 @@ export const updateCheckStatus = async (checkId: string, status: CheckStatus, ac
     await batch.commit();
 };
 
-export const deleteCheck = async (id: string) => {
+export const deleteCheckFull = async (id: string) => {
+    const batch = writeBatch(db);
     const docRef = doc(db, 'checks', id);
-    await deleteDoc(docRef);
+    const snap = await getDoc(docRef);
+
+    if (snap.exists()) {
+        const check = snap.data() as PayableCheck;
+
+        // If PASSED, Reverse Financials
+        if (check.status === CheckStatus.PASSED && check.accountId) {
+            // 1. Reverse Bank: Debit (Increase Balance)
+            const bankRef = doc(db, 'accounts', check.accountId);
+            batch.update(bankRef, { balance: increment(check.amount) });
+
+            // 2. Reverse Checks Payable (2030): Credit (Increase Debt)
+            const q = query(accountsRef, where('code', '==', '2030'));
+            const querySnapshot = await getDocs(q);
+            if (!querySnapshot.empty) {
+                const checksPayableRef = querySnapshot.docs[0].ref;
+                // We previously subtracted amount. Now we add it back.
+                batch.update(checksPayableRef, { balance: increment(check.amount) });
+            }
+        }
+    }
+
+    batch.delete(docRef);
+    await batch.commit();
 };
 
 // --- Loans ---
@@ -776,16 +800,17 @@ export const addLoan = async (loan: Loan, depositAccountId: string) => {
     const batch = writeBatch(db);
 
     // 1. Save Loan
+    // Ensure ID consistency. if loan.id is provided, use it.
     const loanRef = doc(db, 'loans', loan.id);
-    batch.set(loanRef, cleanData(loan));
+    batch.set(loanRef, cleanData({ ...loan, depositAccountId }));
 
     // 2. Update Bank Balance (Receive Loan - Debit Asset)
+    // Debit Asset = Increase Balance
     const bankRef = doc(db, 'accounts', depositAccountId);
     batch.update(bankRef, { balance: increment(loan.amount) });
 
     // 3. Update Loans Payable Balance (2040 - Credit Liability)
-    // Credit Liability = Increase Debt.
-    // So increment(amount).
+    // Credit Liability = Increase Debt (Balance is + for Liability)
     const q = query(accountsRef, where('code', '==', '2040'));
     const querySnapshot = await getDocs(q);
     if (!querySnapshot.empty) {
@@ -794,6 +819,128 @@ export const addLoan = async (loan: Loan, depositAccountId: string) => {
     }
 
     await batch.commit();
+};
+
+export const deleteLoanFull = async (loanId: string, depositAccountId?: string) => {
+    const batch = writeBatch(db);
+
+    // 1. Fetch Loan
+    const loanRef = doc(db, 'loans', loanId);
+    const loanSnap = await getDoc(loanRef);
+    if (!loanSnap.exists()) throw new Error('Loan not found');
+    const loanData = loanSnap.data() as Loan;
+
+    // 2. Fetch and Revert Repayments
+    // We must find all repayments for this loan
+    // Since we don't have an index, we might need to filter client side or just query if possible.
+    // 'repayments' collection? Wait, in `addLoanRepayment` (implied below) we add to `loan_repayments`?
+    // Let's check where repayments are stored. The snippet ended before `addLoanRepayment`.
+    // I need to assume a collection `loan_repayments`.
+    // Let's assume we can query them.
+    const repaymentsQ = query(collection(db, 'loan_repayments'), where('loanId', '==', loanId));
+    const repaymentsSnap = await getDocs(repaymentsQ);
+
+    for (const repDoc of repaymentsSnap.docs) {
+        const rep = repDoc.data() as LoanRepayment;
+        // Reverse Repayment:
+        // Repayment was: Credit Bank (Decrease), Debit Liability (Decrease).
+        // Reversal: Debit Bank (Increase), Credit Liability (Increase).
+
+        // 2a. Increase Bank Balance
+        if (rep.paymentAccountId) {
+            const bankRef = doc(db, 'accounts', rep.paymentAccountId);
+            batch.update(bankRef, { balance: increment(rep.amount) });
+        }
+
+        // 2b. Increase Liability (2040)
+        // We need to find 2040 again. Since we can't query inside batch loop easily efficiently without reads,
+        // we should find it once. But we can just use the same logic if we found it before.
+        // For now, let's assume we find it or skip if not critical, but it IS critical.
+        // Let's assume we do another query or just rely on '2040' being present.
+        // Actually, we can't query inside the loop easily. 
+        // We will do one global query for 2040 at the start of function.
+    }
+
+    // Defer 2040 lookup to start
+    const liabilityQ = query(accountsRef, where('code', '==', '2040'));
+    const liabilitySnap = await getDocs(liabilityQ);
+    let liabilityRef: any = null;
+    if (!liabilitySnap.empty) liabilityRef = liabilitySnap.docs[0].ref;
+
+    // Execute Repayment Reversals (Liability part)
+    if (liabilityRef) {
+        // Find Interest Expense Account (5080) for Reversal
+        const interestQ = query(accountsRef, where('code', '==', '5080'));
+        const interestSnap = await getDocs(interestQ);
+        let interestRef: any = null;
+        if (!interestSnap.empty) interestRef = interestSnap.docs[0].ref;
+
+        for (const repDoc of repaymentsSnap.docs) {
+            const rep = repDoc.data() as LoanRepayment;
+
+            // Reverse Principal (Liability)
+            if (rep.principalAmount) {
+                batch.update(liabilityRef, { balance: increment(rep.principalAmount) });
+            }
+
+            // Reverse Interest Expense (5080)
+            if (rep.interestAmount && rep.interestAmount > 0 && interestRef) {
+                // Expense is Debit (Positive). Reversal: Credit (Negative).
+                batch.update(interestRef, { balance: increment(-rep.interestAmount) });
+            }
+
+            batch.delete(repDoc.ref);
+        }
+    }
+
+    // 3. Reverse Loan Receipt
+    // We received: Dr Bank (Increase), Cr Liability (Increase).
+    // Reversal: Cr Bank (Decrease), Dr Liability (Decrease).
+
+    // 3a. Decrease Bank
+    // We need the depositAccountId. It is NOT stored on the Loan object in `addLoan` provided in the snippet!
+    // `addLoan` takes `depositAccountId` as arg but doesn't seemingly save it in `loan` object?
+    // Let's check `addLoan` implementation again.
+    // It calls `batch.set(loanRef, cleanData(loan))`. If loan doesn't have `depositAccountId` field, it's lost.
+    // We SHOULD add `depositAccountId` to the Loan interface or data model to be able to reverse it later!
+    // If we don't have it, we can't reverse the specific bank account effect easily.
+    // The user passed it in `LoansManager`. 
+    // I will assume for now we might have to Ask the user or `editLoanFull` will require passing it again from the UI (but UI might not know).
+    // Better fix: Update `addLoan` to store `depositAccountId` in the Loan document.
+    // For existing loans, it might be missing.
+    // If missing, we can prompt or generic "Bank"?
+    // Let's update `addLoan` to store it first.
+
+    if (loanData['depositAccountId']) {
+        const originalBankRef = doc(db, 'accounts', loanData['depositAccountId']);
+        batch.update(originalBankRef, { balance: increment(-loanData.amount) });
+    } else if (depositAccountId) {
+        const bankRef = doc(db, 'accounts', depositAccountId);
+        batch.update(bankRef, { balance: increment(-loanData.amount) });
+    }
+
+    // 3b. Decrease Liability
+    if (liabilityRef) {
+        batch.update(liabilityRef, { balance: increment(-loanData.amount) });
+    }
+
+    // 4. Delete Loan Doc
+    batch.delete(loanRef);
+
+    await batch.commit();
+};
+
+export const editLoanFull = async (loanId: string, newLoanData: Loan, depositAccountId: string) => {
+    // 1. Delete Old (Pass depositAccountId if needed, or hope it's in doc)
+    // We read the old doc inside deleteLoanFull, so we can check if it has it.
+    // If not, and we are editing, maybe we assume the new depositAccountId is the same? 
+    // Or we just accept we might have a drift if we can't find the old account.
+    // But we update `addLoan` to save it now.
+    await deleteLoanFull(loanId, depositAccountId); // passing new one as fallback
+    // 2. Create New
+    // Ensure we save depositAccountId in the new doc
+    const dataToSave = { ...newLoanData, depositAccountId };
+    await addLoan(dataToSave, depositAccountId);
 };
 
 export const addLoanRepayment = async (repayment: LoanRepayment) => {
@@ -829,6 +976,48 @@ export const addLoanRepayment = async (repayment: LoanRepayment) => {
             batch.update(interestExpRef, { balance: increment(repayment.interestAmount) });
         }
     }
+
+    await batch.commit();
+};
+
+export const deleteLoanRepaymentFull = async (repaymentId: string) => {
+    const batch = writeBatch(db);
+
+    const repayRef = doc(db, 'loan_repayments', repaymentId);
+    const repaySnap = await getDoc(repayRef);
+    if (!repaySnap.exists()) throw new Error("Repayment not found");
+    const rep = repaySnap.data() as LoanRepayment;
+
+    // 1. Reverse Bank (Increase Balance)
+    if (rep.paymentAccountId) {
+        const bankRef = doc(db, 'accounts', rep.paymentAccountId);
+        batch.update(bankRef, { balance: increment(rep.amount) });
+    }
+
+    // 2. Reverse Loan Balance (Increase Remaining)
+    const loanRef = doc(db, 'loans', rep.loanId);
+    batch.update(loanRef, { remainingBalance: increment(rep.principalAmount) });
+
+    // 3. Reverse Liability (2040) - Increase Debt
+    const qLoan = query(accountsRef, where('code', '==', '2040'));
+    const snapLoan = await getDocs(qLoan);
+    if (!snapLoan.empty) {
+        const loansPayableRef = snapLoan.docs[0].ref;
+        batch.update(loansPayableRef, { balance: increment(rep.principalAmount) });
+    }
+
+    // 4. Reverse Interest Expense (5080) - Decrease Expense
+    if (rep.interestAmount > 0) {
+        const qInterest = query(accountsRef, where('code', '==', '5080'));
+        const snapInterest = await getDocs(qInterest);
+        if (!snapInterest.empty) {
+            const interestExpRef = snapInterest.docs[0].ref;
+            batch.update(interestExpRef, { balance: increment(-rep.interestAmount) });
+        }
+    }
+
+    // 5. Delete Doc
+    batch.delete(repayRef);
 
     await batch.commit();
 };

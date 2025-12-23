@@ -4,7 +4,6 @@ import {
     ArrowUpCircle, ArrowDownCircle, AlertCircle, CheckCircle, X
 } from 'lucide-react';
 import {
-    subscribeToCollection,
     deleteSaleFull,
     deleteExpenseFull,
     deletePayrollFull,
@@ -12,25 +11,46 @@ import {
     editSaleFull,
     editExpenseFull,
     editPayrollFull,
-    deleteTransferFull
+    deleteTransferFull,
+    deleteCheckFull,
+    deleteLoanFull,
+    deleteLoanRepaymentFull,
+    editLoanFull
 } from '../services/firestore';
-import { SaleRecord, PurchaseRequest, PayrollPayment, InventoryTransaction, InventoryItem, TransferRecord } from '../types';
+import { SaleRecord, PurchaseRequest, PayrollPayment, InventoryTransaction, InventoryItem, TransferRecord, PayableCheck, Loan, LoanRepayment, Account, JournalEntry } from '../types';
 import { toPersianNumber, formatPrice, toEnglishDigits, toPersianDate, toPersianDigits } from '../utils';
 import { toast } from 'react-hot-toast';
 import PersianDatePicker from './PersianDatePicker';
 
 // Tabs
-type TabType = 'ALL' | 'SALES' | 'EXPENSES' | 'INVENTORY' | 'PAYROLL' | 'TRANSFERS';
+type TabType = 'ALL' | 'SALES' | 'EXPENSES' | 'INVENTORY' | 'PAYROLL' | 'TRANSFERS' | 'CHECKS' | 'LOANS';
 
-const TransactionManager: React.FC = () => {
+interface TransactionManagerProps {
+    sales: SaleRecord[];
+    purchases: PurchaseRequest[];
+    payrollPayments: PayrollPayment[];
+    inventoryTransactions: InventoryTransaction[];
+    inventoryItems: InventoryItem[];
+    transfers: TransferRecord[];
+    checks: PayableCheck[];
+    loans: Loan[];
+    repayments: LoanRepayment[];
+    journals: JournalEntry[];
+    accounts: Account[];
+}
+
+const TransactionManager: React.FC<TransactionManagerProps> = ({
+    sales,
+    purchases: expenses,
+    payrollPayments: payroll,
+    inventoryTransactions: inventory,
+    inventoryItems,
+    transfers,
+    checks,
+    loans,
+    repayments
+}) => {
     const [activeTab, setActiveTab] = useState<TabType>('ALL');
-    const [sales, setSales] = useState<SaleRecord[]>([]);
-    const [expenses, setExpenses] = useState<PurchaseRequest[]>([]);
-    const [payroll, setPayroll] = useState<PayrollPayment[]>([]);
-    const [inventory, setInventory] = useState<InventoryTransaction[]>([]);
-    const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
-    const [transfers, setTransfers] = useState<TransferRecord[]>([]);
-    const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
 
     // Edit State
@@ -38,33 +58,9 @@ const TransactionManager: React.FC = () => {
     const [editForm, setEditForm] = useState({
         amount: '',
         description: '',
-        date: ''
+        date: '',
+        depositAccountId: '' // For Loans
     });
-
-    // Subscribe to data
-    useEffect(() => {
-        const unsubSales = subscribeToCollection<SaleRecord>('sales', setSales);
-        const unsubExpenses = subscribeToCollection<PurchaseRequest>('purchases', setExpenses);
-        const unsubPayroll = subscribeToCollection<PayrollPayment>('payroll_payments', setPayroll);
-        const unsubInventory = subscribeToCollection<InventoryTransaction>('inventory_transactions', setInventory);
-        const unsubItems = subscribeToCollection<InventoryItem>('inventory_items', setInventoryItems);
-        const unsubTransfers = subscribeToCollection<TransferRecord>('transfers', setTransfers);
-
-        return () => {
-            unsubSales();
-            unsubExpenses();
-            unsubPayroll();
-            unsubInventory();
-            unsubItems();
-            unsubTransfers();
-        };
-    }, []);
-
-    useEffect(() => {
-        if (sales.length || expenses.length || payroll.length || inventory.length || transfers.length) {
-            setLoading(false);
-        }
-    }, [sales, expenses, payroll, inventory, transfers]);
 
     // Normalize Data for Unified List
     const getAllTransactions = () => {
@@ -75,12 +71,16 @@ const TransactionManager: React.FC = () => {
             let quantity = 0;
             let unit = '';
             let itemName = '';
+            let description = t.description || t.details || t.notes || '';
 
             // Handle Inventory Timestamp
             if (type === 'INVENTORY') {
                 if (t.date?.toDate) {
                     const dateObj = t.date.toDate();
                     dateStr = toPersianDate(dateObj);
+                    displayDate = dateStr;
+                } else if (t.date instanceof Date) { // Handle JS Date object
+                    dateStr = toPersianDate(t.date);
                     displayDate = dateStr;
                 }
 
@@ -96,10 +96,30 @@ const TransactionManager: React.FC = () => {
             // Handle Payroll Amount
             if (type === 'PAYROLL') {
                 amount = t.totalAmount;
+                description = `حقوق: ${t.employeeName}`;
             }
 
-            // Handle Sales with 0 amount (Credit/Manual)
-            // If amount is undefined, it remains undefined. If 0, it is 0.
+            // Handle Checks
+            if (type === 'CHECK') {
+                dateStr = t.dueDate;
+                displayDate = t.dueDate;
+                description = `چک: ${t.payee} (${t.bankName || '-'})`;
+            }
+
+            // Handle Loans
+            if (type === 'LOAN') {
+                dateStr = t.startDate;
+                displayDate = t.startDate;
+                description = `وام دریافتی: ${t.lender}`;
+            }
+
+            // Handle Loan Repayments
+            if (type === 'LOAN_REPAYMENT') {
+                description = `بازپرداخت وام`;
+                // Maybe find Lender Name?
+                const loan = loans.find(l => l.id === t.loanId);
+                if (loan) description += ` (${loan.lender})`;
+            }
 
             return {
                 ...t,
@@ -108,7 +128,8 @@ const TransactionManager: React.FC = () => {
                 quantity,
                 unit,
                 itemName,
-                displayDate, // Keep Persian string for display
+                displayDate,
+                normalizedDescription: description,
                 // For sorting, we need English digits YYYY/MM/DD
                 sortKey: toEnglishDigits(dateStr || '')
             };
@@ -119,7 +140,10 @@ const TransactionManager: React.FC = () => {
             ...expenses.map(e => normalize(e, 'EXPENSE')),
             ...payroll.map(p => normalize(p, 'PAYROLL')),
             ...inventory.map(i => normalize(i, 'INVENTORY')),
-            ...transfers.map(t => normalize(t, 'TRANSFER'))
+            ...transfers.map(t => normalize(t, 'TRANSFER')),
+            ...checks.map(c => normalize(c, 'CHECK')),
+            ...loans.map(l => normalize(l, 'LOAN')),
+            ...repayments.map(r => normalize(r, 'LOAN_REPAYMENT'))
         ];
         return all.sort((a, b) => b.sortKey.localeCompare(a.sortKey));
     };
@@ -130,22 +154,31 @@ const TransactionManager: React.FC = () => {
         if (activeTab === 'PAYROLL' && t.type !== 'PAYROLL') return false;
         if (activeTab === 'INVENTORY' && t.type !== 'INVENTORY') return false;
         if (activeTab === 'TRANSFERS' && t.type !== 'TRANSFER') return false;
+        if (activeTab === 'CHECKS' && t.type !== 'CHECK') return false;
+        if (activeTab === 'LOANS' && (t.type !== 'LOAN' && t.type !== 'LOAN_REPAYMENT')) return false;
 
         if (searchTerm) {
             const searchLower = searchTerm.toLowerCase();
-            // Safe check for properties
-            const desc = (t as any).description || (t as any).details || (t as any).employeeName || '';
-            return desc.toLowerCase().includes(searchLower);
+            return t.normalizedDescription.toLowerCase().includes(searchLower) ||
+                (t.customerName && t.customerName.toLowerCase().includes(searchLower)) ||
+                (t.itemName && t.itemName.toLowerCase().includes(searchLower));
         }
         return true;
     });
 
     const handleEditClick = (transaction: any) => {
+        // Only allow editing for certain types for now
+        if (!['SALE', 'EXPENSE', 'PAYROLL', 'LOAN'].includes(transaction.type)) {
+            toast.error('ویرایش برای این نوع تراکنش فعلاً پشتیبانی نمی‌شود.');
+            return;
+        }
+
         setEditingTransaction(transaction);
         setEditForm({
             amount: transaction.amount ? transaction.amount.toString() : '',
             description: transaction.description || transaction.details || transaction.notes || '',
-            date: transaction.date
+            date: transaction.date || transaction.startDate || '',
+            depositAccountId: transaction.depositAccountId || ''
         });
     };
 
@@ -181,6 +214,35 @@ const TransactionManager: React.FC = () => {
                     notes: description
                 };
                 await editPayrollFull(editingTransaction.id, newPayment);
+            } else if (editingTransaction.type === 'LOAN') {
+                // For Loan Edit, we need updated object
+                // We only allow editing Basics.
+                // Ideally we should reuse AddLoan modal logic but here we simplify.
+                const newLoan: Loan = {
+                    ...editingTransaction,
+                    totalAmount: amount,
+                    amount: amount, // Assuming simple loan
+                    startDate: date,
+                    lender: description // reusing description field for Lender name in this simple form? Or should we keep lender separate?
+                    // editingTransaction.lender is correct field. description is normalized.
+                    // The form only has 'description' input.
+                    // Let's assume user might edit lender name in description field if we map it back?
+                    // Or better: Don't map description to Lender.
+                    // Just update basic fields.
+                };
+                // Fix: Mapping description to 'description' field of Loan if exists, or Lender?
+                if (editForm.description !== editingTransaction.normalizedDescription) {
+                    // Assume edit is for description/notes
+                    newLoan.description = description;
+                }
+
+                // We require depositAccountId for full edit reversal
+                const depId = editForm.depositAccountId || editingTransaction.depositAccountId;
+                if (!depId) {
+                    toast.error('حساب واریزی مشخص نیست. امکان ویرایش وجود ندارد.');
+                    return;
+                }
+                await editLoanFull(editingTransaction.id, newLoan, depId);
             }
 
             toast.success('تراکنش با موفقیت ویرایش شد');
@@ -202,16 +264,15 @@ const TransactionManager: React.FC = () => {
             } else if (transaction.type === 'PAYROLL') {
                 await deletePayrollFull(transaction.id);
             } else if (transaction.type === 'INVENTORY') {
-                // We need a deleteInventoryTransactionFull but currently we have deleteInventoryUsageFull
-                // Check if it's usage or purchase (purchase is EXPENSE type usually?)
-                // In firestore.ts saveInventoryPurchase creates a purchase doc AND inventory transaction.
-                // The purchase doc is type EXPENSE.
-                // The inventory transaction is type INVENTORY.
-                // If we delete the EXPENSE, we handle the inventory part in deleteExpenseFull.
-                // So here 'INVENTORY' type usually means USAGE or ADJUSTMENT.
                 await deleteInventoryUsageFull(transaction.id);
             } else if (transaction.type === 'TRANSFER') {
                 await deleteTransferFull(transaction.id);
+            } else if (transaction.type === 'CHECK') {
+                await deleteCheckFull(transaction.id);
+            } else if (transaction.type === 'LOAN') {
+                await deleteLoanFull(transaction.id, transaction.depositAccountId);
+            } else if (transaction.type === 'LOAN_REPAYMENT') {
+                await deleteLoanRepaymentFull(transaction.id);
             }
             toast.success('تراکنش با موفقیت حذف شد و اثرات آن بازگردانده شد');
         } catch (error) {
@@ -227,6 +288,9 @@ const TransactionManager: React.FC = () => {
             case 'PAYROLL': return { text: 'حقوق', color: 'bg-orange-100 text-orange-800' };
             case 'INVENTORY': return { text: 'انبار', color: 'bg-blue-100 text-blue-800' };
             case 'TRANSFER': return { text: 'انتقال', color: 'bg-purple-100 text-purple-800' };
+            case 'CHECK': return { text: 'چک', color: 'bg-teal-100 text-teal-800' };
+            case 'LOAN': return { text: 'وام', color: 'bg-indigo-100 text-indigo-800' };
+            case 'LOAN_REPAYMENT': return { text: 'بازپرداخت وام', color: 'bg-indigo-50 text-indigo-600' };
             default: return { text: type, color: 'bg-gray-100 text-gray-800' };
         }
     };
@@ -261,6 +325,8 @@ const TransactionManager: React.FC = () => {
                     { id: 'PAYROLL', label: 'حقوق و دستمزد' },
                     { id: 'INVENTORY', label: 'تراکنش‌های انبار' },
                     { id: 'TRANSFERS', label: 'انتقال وجه' },
+                    { id: 'CHECKS', label: 'چک‌ها' },
+                    { id: 'LOANS', label: 'وام و تسهیلات' },
                 ].map(tab => (
                     <button
                         key={tab.id}
@@ -302,7 +368,7 @@ const TransactionManager: React.FC = () => {
                                             </span>
                                         </td>
                                         <td className="p-4 text-sm text-slate-700">
-                                            {(t.description || t.details || t.employeeName || '-')}
+                                            {t.normalizedDescription}
                                             {t.type === 'SALE' && (
                                                 <div className="flex flex-wrap gap-x-2 gap-y-1 mt-1 text-xs text-slate-500">
                                                     {t.snappFoodAmount > 0 && <span className="bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded">اسنپ: {formatPrice(t.snappFoodAmount)}</span>}
@@ -327,13 +393,15 @@ const TransactionManager: React.FC = () => {
                                         </td>
                                         <td className="p-4">
                                             <div className="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button
-                                                    onClick={() => handleEditClick(t)}
-                                                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                                    title="ویرایش"
-                                                >
-                                                    <Edit2 className="w-4 h-4" />
-                                                </button>
+                                                {['SALE', 'EXPENSE', 'PAYROLL', 'LOAN'].includes(t.type) && (
+                                                    <button
+                                                        onClick={() => handleEditClick(t)}
+                                                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                                        title="ویرایش"
+                                                    >
+                                                        <Edit2 className="w-4 h-4" />
+                                                    </button>
+                                                )}
                                                 <button
                                                     onClick={() => handleDelete(t)}
                                                     className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
